@@ -353,6 +353,30 @@ def get_player(player_id: str):
         raise HTTPException(status_code=404, detail="Player not found.")
     return fix_double_encoding(response.json())
 
+@app.get("/standings/now")
+def get_standings_now():
+    url = "https://api-web.nhle.com/v1/standings/now"
+    headers = {'User-Agent': 'Mozilla/5.0'}
+    response = requests.get(url, headers=headers)
+    response.encoding = "utf-8"
+    if response.status_code != 200:
+        if response.status_code == 429:
+            raise HTTPException(status_code=429, detail="NHL API rate limit exceeded.")
+        raise HTTPException(status_code=404, detail="Standings not found.")
+    return fix_double_encoding(response.json())
+
+@app.get("/standings/{date}")
+def get_standings_date(date: str):
+    url = f"https://api-web.nhle.com/v1/standings/{date}"
+    headers = {'User-Agent': 'Mozilla/5.0'}
+    response = requests.get(url, headers=headers)
+    response.encoding = "utf-8"
+    if response.status_code != 200:
+        if response.status_code == 429:
+            raise HTTPException(status_code=429, detail="NHL API rate limit exceeded.")
+        raise HTTPException(status_code=404, detail="Standings not found.")
+    return fix_double_encoding(response.json())
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="127.0.0.1", port=8000)
