@@ -1,0 +1,128 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+:root {
+  /* Core Colors */
+  --bg-primary: #0F172A; /* Slate 900 */
+  --bg-secondary: #1E293B; /* Slate 800 */
+  --bg-tertiary: #334155; /* Slate 700 */
+  
+  --text-primary: #F8FAFC; /* Slate 50 */
+  --text-secondary: #94A3B8; /* Slate 400 */
+  --text-tertiary: #64748B; /* Slate 500 */
+  
+  --border-primary: #334155;
+  --border-secondary: #1E293B;
+  
+  --accent-primary: #38BDF8; /* Sky 400 */
+  --accent-secondary: #0284C7; /* Sky 600 */
+  
+  --error: #EF4444; /* Red 500 */
+  --success: #22C55E; /* Green 500 */
+  
+  /* Rink Colors */
+  --color-rink-bg: #F0F4F8;
+  --color-rink-boards: #4a5568;
+  --color-rink-red: #e53e3e;
+  --color-rink-blue: #3182ce;
+  --color-rink-crease: #bee3f8;
+  --color-rink-text: #718096;
+  
+  /* Typography */
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  
+  /* Shadows & FX */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-glow: 0 0 15px rgba(56, 189, 248, 0.3);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -0.025em;
+}
+
+/* Animations */
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.1); }
+}
+
+.pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Buttons & Inputs */
+button {
+  font-family: inherit;
+  border: none;
+  cursor: pointer;
+  background: none;
+}
+
+.btn-primary {
+  background-color: var(--accent-primary);
+  color: var(--bg-primary);
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-weight: 500;
+  font-size: 0.875rem;
+  transition: all 0.2s;
+}
+
+.btn-primary:hover {
+  background-color: #7DD3FC; /* Sky 300 */
+  box-shadow: var(--shadow-glow);
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-weight: 500;
+  font-size: 0.875rem;
+  transition: all 0.2s;
+  border: 1px solid var(--border-primary);
+}
+
+.btn-secondary:hover {
+  background-color: var(--bg-secondary);
+  border-color: var(--text-tertiary);
+}
+
+input[type="date"] {
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-primary);
+  padding: 0.5rem;
+  border-radius: 0.5rem;
+  font-family: inherit;
+  font-size: 0.875rem;
+}
+
+input[type="date"]:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+}
