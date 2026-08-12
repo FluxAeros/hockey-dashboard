@@ -4,6 +4,23 @@ export interface TeamInfo {
   teamLogo: string;
 }
 
+// Eastern: Atlantic + Metropolitan
+// Western: Central + Pacific
+export const TEAM_CONFERENCE: Record<string, "Eastern" | "Western"> = {
+  // Eastern – Atlantic
+  BOS: "Eastern", BUF: "Eastern", DET: "Eastern", FLA: "Eastern",
+  MTL: "Eastern", OTT: "Eastern", TBL: "Eastern", TOR: "Eastern",
+  // Eastern – Metropolitan
+  CAR: "Eastern", CBJ: "Eastern", NJD: "Eastern", NYI: "Eastern",
+  NYR: "Eastern", PHI: "Eastern", PIT: "Eastern", WSH: "Eastern",
+  // Western – Central
+  CHI: "Western", COL: "Western", DAL: "Western", MIN: "Western",
+  NSH: "Western", STL: "Western", UTA: "Western", WPG: "Western",
+  // Western – Pacific
+  ANA: "Western", CGY: "Western", EDM: "Western", LAK: "Western",
+  SEA: "Western", SJS: "Western", VAN: "Western", VGK: "Western",
+};
+
 export const NHL_TEAMS: TeamInfo[] = [
   {
     "teamAbbrev": "ANA",

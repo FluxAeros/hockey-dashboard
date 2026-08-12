@@ -1,12 +1,37 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { RosterCard, type RosterPlayer } from "../components/RosterCard";
 import { TEAM_COLORS } from "../utils/helpers";
-import { NHL_TEAMS } from "../utils/teamsData";
+import { NHL_TEAMS, TEAM_CONFERENCE } from "../utils/teamsData";
 import { ArrowLeft, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
+const gridContainerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.03,
+      delayChildren: 0.05,
+    },
+  },
+  exit: { opacity: 0, transition: { duration: 0.15 } },
+};
+
+const teamCardVariants = {
+  hidden: { opacity: 0, y: 20, scale: 0.94 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: { type: "spring" as const, stiffness: 280, damping: 24, mass: 0.8 },
+  },
+};
+
 export default function Teams() {
   const [selectedTeam, setSelectedTeam] = useState<string | null>(null);
+  const [raisingTeam, setRaisingTeam] = useState<string | null>(null);
+  const [conferenceFilter, setConferenceFilter] = useState<"All" | "Eastern" | "Western">("All");
+  const hasAnimatedGrid = useRef(false);
   
   const [roster, setRoster] = useState<{
     forwards: RosterPlayer[];
@@ -61,9 +86,11 @@ export default function Teams() {
   };
 
   const handleBack = () => {
+    setRaisingTeam(selectedTeam);
     setSelectedTeam(null);
     setRoster(null);
     setError(null);
+    setTimeout(() => setRaisingTeam(null), 600);
   };
 
   const closePlayerModal = () => {
@@ -85,30 +112,60 @@ export default function Teams() {
   const activeTeamInfo = selectedTeam ? NHL_TEAMS.find(t => t.teamAbbrev === selectedTeam) : null;
   const activeColor = selectedTeam ? (TEAM_COLORS[selectedTeam] || 'var(--bg-secondary)') : 'transparent';
 
+  const filteredTeams = conferenceFilter === "All"
+    ? NHL_TEAMS
+    : NHL_TEAMS.filter(t => TEAM_CONFERENCE[t.teamAbbrev] === conferenceFilter);
+
+  const CONF_FILTERS: Array<"All" | "Eastern" | "Western"> = ["All", "Eastern", "Western"];
+
   return (
     <div className="teams-page">
+      {/* Grid view — fades out underneath the expanding card */}
       <AnimatePresence>
-        {!selectedTeam ? (
+        {!selectedTeam && (
           <motion.div 
             key="grid-view"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
+            initial={hasAnimatedGrid.current ? { opacity: 0 } : "hidden"}
+            animate={hasAnimatedGrid.current ? { opacity: 1 } : "visible"}
+            exit={{ opacity: 0, transition: { duration: 0.12 } }}
+            variants={gridContainerVariants}
+            onAnimationStart={() => { hasAnimatedGrid.current = true; }}
           >
-            <h1 className="page-title mb-8">Teams & Rosters</h1>
+            <div className="teams-page-header">
+              <h1 className="page-title">Teams &amp; Rosters</h1>
+              <div className="conference-filter">
+                {CONF_FILTERS.map(f => (
+                  <button
+                    key={f}
+                    className={`conf-filter-btn${conferenceFilter === f ? " active" : ""}`}
+                    onClick={() => {
+                      setConferenceFilter(f);
+                      hasAnimatedGrid.current = false;
+                    }}
+                  >
+                    {f}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="team-selector-grid">
-              {NHL_TEAMS.map(team => {
+              {filteredTeams.map(team => {
                 const color = TEAM_COLORS[team.teamAbbrev] || 'var(--border-primary)';
                 return (
                   <motion.button 
                     layoutId={`team-card-${team.teamAbbrev}`}
-                    key={team.teamAbbrev} 
+                    key={team.teamAbbrev}
+                    variants={teamCardVariants}
                     className="team-card-btn"
                     onClick={() => handleSelectTeam(team.teamAbbrev)}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}
+                    whileHover={{ scale: 1.03, y: -4, transition: { type: "spring", stiffness: 380, damping: 22 } }}
+                    whileTap={{ scale: 0.97, transition: { type: "spring", stiffness: 500, damping: 28 } }}
+                    style={{ 
+                      backgroundColor: 'var(--bg-secondary)', 
+                      borderColor: 'var(--border-primary)',
+                      position: 'relative',
+                      zIndex: raisingTeam === team.teamAbbrev ? 10 : 1,
+                    }}
                   >
                     <motion.div layoutId={`team-content-${team.teamAbbrev}`} className="team-card-content">
                       <motion.img layoutId={`team-logo-${team.teamAbbrev}`} src={team.teamLogo} alt={team.teamName} className="team-logo-img" />
@@ -124,21 +181,26 @@ export default function Teams() {
               })}
             </div>
           </motion.div>
-        ) : (
+        )}
+      </AnimatePresence>
+
+      {/* Hero view — card expands via layoutId from the grid card's position */}
+      <AnimatePresence>
+        {selectedTeam && (
           <motion.div 
             key="hero-view"
             className="team-hero-view"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.3 }}
+            transition={{ duration: 0.15 }}
           >
             <motion.button 
               className="back-btn" 
               onClick={handleBack}
-              initial={{ opacity: 0, x: -20 }}
+              initial={{ opacity: 0, x: -16 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.2 }}
+              transition={{ type: "spring", stiffness: 320, damping: 26, delay: 0.15 }}
             >
               <ArrowLeft size={20} />
               <span>Back to Teams</span>
@@ -147,6 +209,7 @@ export default function Teams() {
             <motion.div 
               layoutId={`team-card-${selectedTeam}`}
               className="team-hero-card"
+              transition={{ type: "spring", stiffness: 200, damping: 28 }}
               style={{ 
                 background: `linear-gradient(135deg, ${activeColor}20 0%, var(--bg-secondary) 100%)`,
                 borderColor: activeColor 
@@ -164,9 +227,9 @@ export default function Teams() {
               
               <motion.div 
                 className="team-hero-content"
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: 18 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3, duration: 0.4 }}
+                transition={{ type: "spring", stiffness: 220, damping: 24, delay: 0.22 }}
               >
                 {loading && <div className="mt-8 text-secondary">Loading roster...</div>}
                 {error && <div className="alert-error mt-8">{error}</div>}
@@ -186,11 +249,19 @@ export default function Teams() {
 
       <AnimatePresence>
         {selectedPlayer && (
-          <div className="player-modal-backdrop" onClick={closePlayerModal}>
+          <motion.div
+            className="player-modal-backdrop"
+            onClick={closePlayerModal}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+          >
             <motion.div 
               layoutId={`player-card-${selectedPlayer.id}`}
               className="player-modal"
               onClick={e => e.stopPropagation()}
+              transition={{ type: "spring", stiffness: 300, damping: 28 }}
             >
               <button className="modal-close" onClick={closePlayerModal}><X size={24} /></button>
               
@@ -210,9 +281,9 @@ export default function Teams() {
               </div>
 
               <motion.div 
-                initial={{ opacity: 0, y: 10 }}
+                initial={{ opacity: 0, y: 14 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
+                transition={{ type: "spring", stiffness: 280, damping: 26, delay: 0.1 }}
                 className="player-modal-body"
               >
                 {playerLoading ? (
@@ -284,7 +355,7 @@ export default function Teams() {
                 )}
               </motion.div>
             </motion.div>
-          </div>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>

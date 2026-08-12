@@ -10,15 +10,17 @@ export interface RosterPlayer {
 import { motion } from "framer-motion";
 
 const cardVariants = {
-  hidden: { opacity: 0, y: 24, scale: 0.95 },
+  hidden: { opacity: 0, y: 30, scale: 0.92 },
   visible: (i: number) => ({
     opacity: 1,
     y: 0,
     scale: 1,
     transition: {
-      delay: i * 0.045,
-      duration: 0.35,
-      ease: "easeOut" as const,
+      delay: Math.min(i * 0.04, 0.5),
+      type: "spring" as const,
+      stiffness: 260,
+      damping: 22,
+      mass: 0.8,
     },
   }),
 };
@@ -34,11 +36,12 @@ export function RosterCard({ player, onClick, index = 0 }: { player: RosterPlaye
       onClick={() => onClick(player)}
       className="roster-card"
       whileHover={{ 
-        y: -6,
-        boxShadow: "0 16px 40px rgba(0,0,0,0.4)",
-        transition: { duration: 0.2, ease: "easeOut" }
+        y: -8,
+        scale: 1.02,
+        boxShadow: "0 20px 48px rgba(0,0,0,0.5)",
+        transition: { type: "spring", stiffness: 400, damping: 20 }
       }}
-      whileTap={{ scale: 0.97 }}
+      whileTap={{ scale: 0.96, transition: { type: "spring", stiffness: 500, damping: 25 } }}
     >
       <div className="roster-card-img-container">
         <img 

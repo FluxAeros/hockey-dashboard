@@ -14,10 +14,11 @@ export function GameCard({ game, selected, onSelect }: GameCardProps) {
   const color = STATE_COLORS[state] ?? "#888780";
 
   const getGameTypeTag = (type: number) => {
-    switch (type) {
-      case 1: return <span className="game-type-tag pre">PRE</span>;
-      case 2: return <span className="game-type-tag reg">REG</span>;
-      case 3: return <span className="game-type-tag ply">PLY</span>;
+    const num = Number(type);
+    switch (num) {
+      case 1: return <span className="game-type-tag pre" title="Preseason Game">PRE</span>;
+      case 2: return <span className="game-type-tag reg" title="Regular Season Game">REG</span>;
+      case 3: return <span className="game-type-tag ply" title="Playoff Game">PLY</span>;
       default: return null;
     }
   };

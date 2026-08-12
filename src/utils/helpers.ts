@@ -6,6 +6,25 @@ export function todayDateString(): string {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+/** Shift a YYYY-MM-DD string by `days` (positive = forward, negative = back). */
+export function shiftDate(dateStr: string, days: number): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const dt = new Date(y, m - 1, d + days);
+  const yyyy = dt.getFullYear();
+  const mm = String(dt.getMonth() + 1).padStart(2, "0");
+  const dd = String(dt.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+/** Format YYYY-MM-DD string into localized date without UTC midnight timezone rollback. */
+export function formatLocalDateString(dateStr: string, options?: Intl.DateTimeFormatOptions): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  if (!y || !m || !d) return dateStr;
+  const dt = new Date(y, m - 1, d);
+  return dt.toLocaleDateString(undefined, options || { weekday: "long", month: "short", day: "numeric" });
+}
+
+
 export function xgToRadius(xg: number): number {
   return 1.5 + xg * 6;
 }
