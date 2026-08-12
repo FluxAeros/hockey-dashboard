@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from pathlib import Path
 import pandas as pd
 import numpy as np
 import requests
@@ -33,10 +34,18 @@ SHOT_TYPE_CATEGORIES = ['backhand', 'deflected', 'slap', 'snap', 'tip-in', 'wrap
 
 # Load the advanced gradient boosting model
 # Note: Ensure you have your trained 'xg_model_gb.pkl' file in the directory
+
+BASE_DIR = Path(__file__).resolve().parent
+MODEL_PATH = BASE_DIR / "xg_model_gb.pkl"
+
 try:
-    model = joblib.load('xg_model_gb.pkl')
-except:
-    print("Warning: xg_model_gb.pkl not found. Please train your model first.")
+    model = joblib.load(MODEL_PATH)
+    print(f"Loaded model from: {MODEL_PATH}")
+except FileNotFoundError:
+    print(f"ERROR: Model file not found: {MODEL_PATH}")
+    model = None
+except Exception as e:
+    print(f"ERROR loading model: {type(e).__name__}: {e}")
     model = None
 
 def time_to_seconds(time_str):
