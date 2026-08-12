@@ -102,20 +102,201 @@
   font-size: 2rem;
 }
 
-.date-picker-group {
+/* Date navigation (prev / display / next) */
+.date-nav-group {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 0.5rem;
   background-color: var(--bg-secondary);
-  padding: 0.5rem;
+  padding: 0.4rem 0.6rem;
   border-radius: 0.75rem;
   border: 1px solid var(--border-primary);
 }
 
-.date-picker-group label {
+.date-nav-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 0.5rem;
   color: var(--text-secondary);
+  background: transparent;
+  border: none;
+  transition: background 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+
+.date-nav-arrow:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+/* The button shows the formatted date and opens the picker on click */
+.date-nav-display {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
   font-size: 0.875rem;
-  margin-left: 0.5rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  padding: 0.35rem 0.65rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--border-primary);
+  background: var(--bg-tertiary);
+  white-space: nowrap;
+  user-select: none;
+  transition: border-color 0.15s, background 0.15s;
+  min-width: 9rem;
+  justify-content: center;
+}
+
+.date-nav-display:hover {
+  border-color: var(--accent-primary);
+  background: var(--bg-tertiary);
+}
+
+.date-nav-display:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+.date-nav-icon {
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+/* The actual date input is invisible but clickable on top */
+.date-nav-input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+  font-size: 1rem; /* important: keeps iOS from zooming */
+  border: none;
+  background: transparent;
+}
+
+/* =========================================
+   Custom Date Picker Dropdown
+   ========================================= */
+.datepicker-wrapper {
+  position: relative;
+}
+
+@keyframes dpFadeIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(-6px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+.datepicker-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 200;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: 1rem;
+  padding: 1rem;
+  width: 280px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+  animation: dpFadeIn 0.15s ease;
+}
+
+.datepicker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.datepicker-month-label {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+
+.datepicker-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 0.4rem;
+  color: var(--text-secondary);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.datepicker-nav:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.datepicker-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  margin-bottom: 0.4rem;
+}
+
+.datepicker-weekday {
+  text-align: center;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.2rem 0;
+}
+
+.datepicker-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.datepicker-day {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 34px;
+  border-radius: 0.4rem;
+  font-size: 0.825rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+  width: 100%;
+}
+
+.datepicker-day:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.datepicker-day.today {
+  color: var(--accent-primary);
+  box-shadow: inset 0 0 0 1px var(--accent-primary);
+}
+
+.datepicker-day.selected {
+  background: var(--accent-primary);
+  color: var(--bg-primary);
+  font-weight: 700;
+}
+
+.datepicker-day.selected:hover {
+  background: #7DD3FC;
 }
 
 .alert-error {
@@ -124,6 +305,14 @@
   padding: 1rem;
   border-radius: 0.5rem;
   border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.schedule-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
 }
 
 .text-error {
@@ -544,6 +733,41 @@
   gap: 2rem;
 }
 
+.schedule-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.schedule-title-group {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.schedule-week-range {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+  display: block;
+  margin-top: 0.1rem;
+}
+
+
+.week-nav-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background-color: var(--bg-secondary);
+  padding: 0.35rem 0.5rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--border-primary);
+}
+
+
 .schedule-week {
   display: flex;
   flex-direction: column;
@@ -597,6 +821,46 @@
   min-height: calc(100vh - 4rem);
 }
 
+.teams-page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.conference-filter {
+  display: flex;
+  gap: 0.4rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: 0.75rem;
+  padding: 0.3rem;
+}
+
+.conf-filter-btn {
+  padding: 0.35rem 0.9rem;
+  border-radius: 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: transparent;
+  border: none;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.conf-filter-btn:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.conf-filter-btn.active {
+  background: rgba(56, 189, 248, 0.15);
+  color: var(--accent-primary);
+}
+
 .team-selector-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
@@ -610,6 +874,7 @@
   padding: 1rem;
   text-align: left;
   width: 100%;
+  will-change: transform;
 }
 
 .team-card-btn:hover {
@@ -679,12 +944,10 @@
   border: 1px solid var(--border-primary);
   border-radius: 1rem;
   overflow: hidden;
-  transition: all 0.2s;
+  will-change: transform;
 }
 
 .roster-card:hover {
-  transform: translateY(-4px);
-  box-shadow: var(--shadow-lg);
   border-color: var(--accent-primary);
 }
 
@@ -852,6 +1115,7 @@
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
   display: flex;
   flex-direction: column;
+  overscroll-behavior: contain;
 }
 
 .modal-close {
@@ -985,4 +1249,317 @@
   font-size: 1.5rem;
   font-weight: 800;
   color: var(--accent-primary);
+}
+
+/* =========================================
+   Bottom Navigation (mobile)
+   ========================================= */
+.bottom-nav {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background-color: var(--bg-secondary);
+  border-top: 1px solid var(--border-primary);
+  padding: 0.5rem 0 calc(0.5rem + env(safe-area-inset-bottom));
+  flex-direction: row;
+  justify-content: space-around;
+  align-items: center;
+}
+
+.bottom-nav-link {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  color: var(--text-secondary);
+  text-decoration: none;
+  padding: 0.4rem 1.2rem;
+  border-radius: 0.75rem;
+  transition: color 0.2s;
+  flex: 1;
+}
+
+.bottom-nav-link.active {
+  color: var(--accent-primary);
+}
+
+.bottom-nav-label {
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+/* =========================================
+   Responsive Breakpoints
+   ========================================= */
+@media (max-width: 767px) {
+  /* ---- Layout ---- */
+  .sidebar {
+    display: none;
+  }
+
+  .bottom-nav {
+    display: flex;
+  }
+
+  .main-content {
+    margin-left: 0;
+    padding: 1.25rem 1rem;
+    padding-bottom: calc(5rem + env(safe-area-inset-bottom));
+    max-width: 100%;
+  }
+
+  /* ---- Typography ---- */
+  .page-title {
+    font-size: 1.5rem;
+  }
+
+  /* ---- Dashboard ---- */
+  .dashboard-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  /* ---- Dashboard date nav ---- */
+  .date-nav-group {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .date-nav-display {
+    flex: 1;
+    justify-content: center;
+  }
+
+  /* ---- Game Cards ---- */
+  .game-cards-container {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 0.75rem;
+  }
+
+  /* ---- Status Bar ---- */
+  .status-bar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+  }
+
+  .status-controls {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  /* ---- Scoreboard ---- */
+  .scoreboard {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+    padding: 1rem;
+  }
+
+  .scoreboard-team {
+    border-left: none !important;
+    border-right: none !important;
+    border-top: 4px solid var(--team-color, var(--border-primary));
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1rem;
+  }
+
+  .scoreboard-team.home {
+    text-align: left;
+    align-items: center;
+    border-top: 4px solid var(--team-color, var(--border-primary));
+  }
+
+  .team-xg {
+    font-size: 2rem;
+  }
+
+  .scoreboard-divider span {
+    font-size: 0.75rem;
+    padding: 0.35rem 0.75rem;
+  }
+
+  /* ---- Matchup Board ---- */
+  .matchup-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* ---- Schedule ---- */
+  .schedule-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .schedule-title-group {
+    width: 100%;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  .day-header {
+    font-size: 1rem;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+
+  /* ---- Teams grid ---- */
+  .team-selector-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+  }
+
+  .team-logo-img {
+    width: 56px;
+    height: 56px;
+  }
+
+  .team-card-mascot {
+    font-size: 0.9rem;
+  }
+
+  .team-card-city {
+    font-size: 0.65rem;
+  }
+
+  /* ---- Teams page header ---- */
+  .teams-page-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .conference-filter {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .conf-filter-btn {
+    flex: 1;
+    text-align: center;
+  }
+
+  /* ---- Team Hero view ---- */
+  .team-hero-view {
+    top: 0;
+    left: 0;
+    right: 0;
+    padding: 1rem 1rem 0;
+  }
+
+  .back-btn {
+    padding: 0.75rem 0;
+  }
+
+  .team-hero-card {
+    padding: 1.25rem;
+    gap: 1.25rem;
+    border-left: none;
+    border-right: none;
+    border-radius: 0;
+  }
+
+  .team-hero-header {
+    gap: 1rem;
+    padding-bottom: 1.25rem;
+  }
+
+  .team-hero-logo {
+    width: 80px;
+    height: 80px;
+  }
+
+  .team-hero-city {
+    font-size: 1rem;
+  }
+
+  .team-hero-mascot {
+    font-size: 2.25rem;
+  }
+
+  /* ---- Roster ---- */
+  .roster-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+  }
+
+  .roster-card-img-container {
+    height: 120px;
+  }
+
+  .roster-section-title {
+    font-size: 1.1rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .roster-container {
+    gap: 2rem;
+  }
+
+  /* ---- Player Modal — full bottom sheet, height-capped ---- */
+  .player-modal-backdrop {
+    align-items: flex-end;
+    /* Ensure backdrop never scrolls behind the sheet */
+    overflow: hidden;
+  }
+
+  .player-modal {
+    width: 100%;
+    max-width: 100%;
+    /* dvh accounts for browser chrome / notches; fallback to vh */
+    max-height: 82dvh;
+    max-height: 82vh;
+    height: auto;
+    border-radius: 1.5rem 1.5rem 0 0;
+    /* Scroll happens inside the modal, not on the backdrop */
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    /* Push above the bottom nav bar */
+    margin-bottom: 0;
+  }
+
+  .player-modal-header {
+    padding: 1.5rem;
+    gap: 1rem;
+  }
+
+  .player-modal-avatar {
+    width: 80px;
+    height: 80px;
+  }
+
+  .player-modal-title h2 {
+    font-size: 1.75rem;
+  }
+
+  .player-modal-body {
+    padding: 1.25rem;
+  }
+
+  /* ---- Hockey rink ---- */
+  .rink-section {
+    padding: 0.75rem;
+  }
+}
+
+/* Slightly wider mobile / small tablet */
+@media (min-width: 480px) and (max-width: 767px) {
+  .team-selector-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .roster-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .game-cards-container {
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  }
 }

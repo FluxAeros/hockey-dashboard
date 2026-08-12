@@ -1,38 +1,64 @@
 import { NavLink } from "react-router-dom";
 import { Activity, Calendar, Users, Settings } from "lucide-react";
+import { useEffect, useState } from "react";
+
+function useMobile() {
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 767px)");
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+  return isMobile;
+}
+
+const NAV_LINKS = [
+  { to: "/", icon: Activity, label: "Live" },
+  { to: "/schedule", icon: Calendar, label: "Schedule" },
+  { to: "/teams", icon: Users, label: "Teams" },
+];
 
 export function Sidebar() {
+  const isMobile = useMobile();
+
+  if (isMobile) {
+    return (
+      <nav className="bottom-nav">
+        {NAV_LINKS.map(({ to, icon: Icon, label }) => (
+          <NavLink
+            key={to}
+            to={to}
+            end={to === "/"}
+            className={({ isActive }) => `bottom-nav-link${isActive ? " active" : ""}`}
+          >
+            <Icon size={22} />
+            <span className="bottom-nav-label">{label}</span>
+          </NavLink>
+        ))}
+      </nav>
+    );
+  }
+
   return (
     <aside className="sidebar">
       <div className="sidebar-brand">
         <Activity className="brand-icon" />
-        <span className="brand-text">NHL xG</span>
+        <span className="brand-text">Chel Statz</span>
       </div>
       
       <nav className="sidebar-nav">
-        <NavLink 
-          to="/" 
-          className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}
-        >
-          <Activity className="nav-icon" />
-          <span className="nav-text">Live Tracker</span>
-        </NavLink>
-        
-        <NavLink 
-          to="/schedule" 
-          className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}
-        >
-          <Calendar className="nav-icon" />
-          <span className="nav-text">Schedule</span>
-        </NavLink>
-        
-        <NavLink 
-          to="/teams" 
-          className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}
-        >
-          <Users className="nav-icon" />
-          <span className="nav-text">Teams</span>
-        </NavLink>
+        {NAV_LINKS.map(({ to, icon: Icon, label }) => (
+          <NavLink
+            key={to}
+            to={to}
+            end={to === "/"}
+            className={({ isActive }) => `nav-link${isActive ? " active" : ""}`}
+          >
+            <Icon className="nav-icon" />
+            <span className="nav-text">{label}</span>
+          </NavLink>
+        ))}
       </nav>
 
       <div className="sidebar-footer">

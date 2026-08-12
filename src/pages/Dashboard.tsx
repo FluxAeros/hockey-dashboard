@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import type { NHLGame, Shot, MatchupsResponse, GameStats } from "../types";
-import { todayDateString } from "../utils/helpers";
+import { todayDateString, shiftDate } from "../utils/helpers";
 import { GameCard } from "../components/GameCard";
 import { HockeyRink } from "../components/HockeyRink";
 import { MatchupBoard } from "../components/MatchupBoard";
 import { Scoreboard } from "../components/Scoreboard";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { DatePicker } from "../components/DatePicker";
 
 const API_BASE = "http://127.0.0.1:8000";
 const REFRESH_INTERVAL = 30000;
@@ -193,13 +195,22 @@ export default function Dashboard() {
     <div className="dashboard">
       <div className="dashboard-header">
         <h1 className="page-title">Live Tracker</h1>
-        <div className="date-picker-group">
-          <label>Date</label>
-          <input
-            type="date"
-            value={selectedDate}
-            onChange={e => setSelectedDate(e.target.value)}
-          />
+        <div className="date-nav-group">
+          <button
+            className="date-nav-arrow"
+            onClick={() => setSelectedDate(d => shiftDate(d, -1))}
+            aria-label="Previous day"
+          >
+            <ChevronLeft size={18} />
+          </button>
+          <DatePicker value={selectedDate} onChange={setSelectedDate} />
+          <button
+            className="date-nav-arrow"
+            onClick={() => setSelectedDate(d => shiftDate(d, 1))}
+            aria-label="Next day"
+          >
+            <ChevronRight size={18} />
+          </button>
           <button
             onClick={() => fetchSchedule(selectedDate)}
             disabled={scheduleLoading}
@@ -211,7 +222,7 @@ export default function Dashboard() {
       </div>
 
       {scheduleError && (
-        <div className="alert-error" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div className="alert-error schedule-error">
           <span>{scheduleError}</span>
           {(scheduleWeek.find(d => d.date > selectedDate && d.numberOfGames > 0) || nextStartDate) && (
             <button 

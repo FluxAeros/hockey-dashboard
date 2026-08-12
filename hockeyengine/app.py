@@ -180,7 +180,8 @@ def get_schedule(date: str):
     return fix_double_encoding({
         "games": day.get('games', []) if day else [],
         "gameWeek": game_week,
-        "nextStartDate": data.get("nextStartDate")
+        "nextStartDate": data.get("nextStartDate"),
+        "previousStartDate": data.get("previousStartDate")
     })
 
 @app.get("/boxscore/{game_id}")

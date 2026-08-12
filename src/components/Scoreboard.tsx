@@ -15,7 +15,10 @@ export function Scoreboard({ stats, homeTeamAbbr, awayTeamAbbr, homeTeamName, aw
 
   return (
     <div className="scoreboard">
-      <div className="scoreboard-team away" style={{ borderLeftColor: awayColor }}>
+      <div
+        className="scoreboard-team away"
+        style={{ borderLeftColor: awayColor, "--team-color": awayColor } as React.CSSProperties}
+      >
         <div className="team-abbr">{awayTeamAbbr} · Away</div>
         <div className="team-xg">{stats.awayXG.toFixed(2)} xG</div>
         <div className="team-stats">{stats.awayShots} shots · {stats.awayGoals} goals</div>
@@ -26,7 +29,10 @@ export function Scoreboard({ stats, homeTeamAbbr, awayTeamAbbr, homeTeamName, aw
         <span>vs</span>
       </div>
 
-      <div className="scoreboard-team home" style={{ borderRightColor: homeColor }}>
+      <div
+        className="scoreboard-team home"
+        style={{ borderRightColor: homeColor, "--team-color": homeColor } as React.CSSProperties}
+      >
         <div className="team-abbr">Home · {homeTeamAbbr}</div>
         <div className="team-xg">{stats.homeXG.toFixed(2)} xG</div>
         <div className="team-stats">{stats.homeGoals} goals · {stats.homeShots} shots</div>

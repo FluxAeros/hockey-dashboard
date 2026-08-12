@@ -74,6 +74,12 @@ button {
   border: none;
   cursor: pointer;
   background: none;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+a {
+  -webkit-tap-highlight-color: transparent;
 }
 
 .btn-primary {
