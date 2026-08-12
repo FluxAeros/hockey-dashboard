@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { Activity, Calendar, Users, Settings } from "lucide-react";
+import { Activity, Calendar, Trophy, Users, Settings } from "lucide-react";
 import { useEffect, useState } from "react";
 
 function useMobile() {
@@ -16,6 +16,7 @@ function useMobile() {
 const NAV_LINKS = [
   { to: "/", icon: Activity, label: "Live" },
   { to: "/schedule", icon: Calendar, label: "Schedule" },
+  { to: "/standings", icon: Trophy, label: "Standings" },
   { to: "/teams", icon: Users, label: "Teams" },
 ];
 
@@ -43,8 +44,11 @@ export function Sidebar() {
   return (
     <aside className="sidebar">
       <div className="sidebar-brand">
-        <Activity className="brand-icon" />
-        <span className="brand-text">Chel Statz</span>
+        <img
+          src="/images/logo.png"
+          alt="Chel Statz"
+          className="brand-logo"
+        />
       </div>
       
       <nav className="sidebar-nav">

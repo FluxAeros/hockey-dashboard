@@ -21,21 +21,15 @@
 .sidebar-brand {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  justify-content: center;
   padding: 0 0.5rem 2rem 0.5rem;
-  color: var(--text-primary);
 }
 
-.brand-icon {
-  color: var(--accent-primary);
-  width: 28px;
-  height: 28px;
-}
-
-.brand-text {
-  font-size: 1.25rem;
-  font-weight: 700;
-  letter-spacing: -0.05em;
+.brand-logo {
+  display: block;
+  width: 180px;
+  height: auto;
+  object-fit: contain;
 }
 
 .sidebar-nav {
@@ -1563,3 +1557,215 @@
     grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   }
 }
+
+/* =========================================
+   Standings Page
+   ========================================= */
+.standings-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.standings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.standings-grid-2col {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(480px, 1fr));
+  gap: 1.5rem;
+}
+
+.standings-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: 1rem;
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+}
+
+.standings-card-header {
+  padding: 1.25rem 1.5rem;
+  background: rgba(255, 255, 255, 0.02);
+  border-bottom: 1px solid var(--border-primary);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.standings-card-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+
+.standings-card-subtitle {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  display: block;
+  margin-top: 0.15rem;
+}
+
+.standings-table-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.standings-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.85rem;
+}
+
+.standings-table th {
+  padding: 0.75rem 0.85rem;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-size: 0.725rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  user-select: none;
+  border-bottom: 1px solid var(--border-primary);
+}
+
+.standings-table th.clickable {
+  cursor: pointer;
+}
+
+.standings-table th.clickable:hover {
+  color: var(--text-primary);
+}
+
+.standings-table td {
+  padding: 0.75rem 0.85rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.standings-row:hover td {
+  background: rgba(56, 189, 248, 0.04);
+}
+
+.standings-row.border-playoff-cutoff td {
+  border-bottom: 2px dashed var(--accent-primary);
+}
+
+.th-rank, .td-rank {
+  width: 32px;
+  text-align: center;
+  color: var(--text-tertiary);
+  font-weight: 600;
+}
+
+.th-num, .td-num {
+  text-align: center;
+}
+
+.td-pts {
+  font-weight: 800;
+  font-size: 0.95rem;
+}
+
+.team-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.standings-team-logo {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+}
+
+.team-cell-name {
+  font-weight: 600;
+}
+
+.team-cell-abbr {
+  display: none;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.clinch-badge {
+  font-size: 0.65rem;
+  font-weight: 800;
+  padding: 0.1rem 0.35rem;
+  border-radius: 0.25rem;
+  background: rgba(56, 189, 248, 0.18);
+  color: var(--accent-primary);
+  text-transform: uppercase;
+}
+
+.streak-tag {
+  font-weight: 700;
+  font-size: 0.75rem;
+  padding: 0.15rem 0.4rem;
+  border-radius: 0.25rem;
+}
+
+.streak-tag.w {
+  background: rgba(34, 197, 94, 0.15);
+  color: var(--success);
+}
+
+.streak-tag.l {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--error);
+}
+
+.streak-tag.ot {
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+}
+
+@media (max-width: 767px) {
+  .standings-grid-2col {
+    grid-template-columns: 1fr;
+  }
+
+  .team-cell-name {
+    display: none;
+  }
+
+  .team-cell-abbr {
+    display: inline;
+  }
+
+  .hide-mobile {
+    display: none !important;
+  }
+
+  .standings-table th, .standings-table td {
+    padding: 0.6rem 0.5rem;
+    font-size: 0.775rem;
+  }
+
+  .standings-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .standings-header .conference-filter {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .standings-header .conf-filter-btn {
+    flex: 1;
+    text-align: center;
+  }
+}
+

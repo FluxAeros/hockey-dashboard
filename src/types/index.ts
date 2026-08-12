@@ -58,3 +58,41 @@ export interface MatchupsResponse {
   team1?: TeamMatchups;
   team2?: TeamMatchups;
 }
+
+export interface StandingItem {
+  conferenceAbbrev: string;
+  conferenceName: string;
+  divisionAbbrev: string;
+  divisionName: string;
+  divisionSequence: number;
+  conferenceSequence: number;
+  leagueSequence: number;
+  wildcardSequence: number;
+  gamesPlayed: number;
+  wins: number;
+  losses: number;
+  otLosses: number;
+  points: number;
+  pointPctg: number;
+  regulationWins: number;
+  regulationPlusOtWins: number;
+  goalFor: number;
+  goalAgainst: number;
+  goalDifferential: number;
+  streakCode: string;
+  streakCount: number;
+  l10Wins: number;
+  l10Losses: number;
+  l10OtLosses: number;
+  clinchIndicator?: string;
+  teamAbbrev: { default: string };
+  teamName: { default: string };
+  teamCommonName: { default: string };
+  teamLogo: string;
+}
+
+export interface StandingsResponse {
+  standingsDateTimeUtc?: string;
+  standings: StandingItem[];
+}
+
