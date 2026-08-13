@@ -6,7 +6,7 @@ import { GameCard } from "../components/GameCard";
 import { HockeyRink } from "../components/HockeyRink";
 import { MatchupBoard } from "../components/MatchupBoard";
 import { Scoreboard } from "../components/Scoreboard";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from "lucide-react";
 import { DatePicker } from "../components/DatePicker";
 
 const API_BASE = "http://127.0.0.1:8000";
@@ -38,6 +38,7 @@ export default function Dashboard() {
   const [countdown, setCountdown] = useState<number>(REFRESH_INTERVAL / 1000);
   const [isLive, setIsLive] = useState<boolean>(false);
   const [pollingActive, setPollingActive] = useState<boolean>(false);
+  const [gamesCollapsed, setGamesCollapsed] = useState<boolean>(false);
   const [matchups, setMatchups] = useState<MatchupsResponse | null>(null);
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -151,6 +152,7 @@ export default function Dashboard() {
   const handleSelectGame = useCallback(async (game: NHLGame) => {
     stopPolling();
     setSelectedGame(game);
+    setGamesCollapsed(true);
     setShots([]);
     setHomeTeamId(null);
     setHomeTeamName(game.homeTeam?.name?.default ?? game.homeTeam?.abbrev ?? "Home");
@@ -239,9 +241,24 @@ export default function Dashboard() {
       )}
       
       {scheduleGames.length > 0 && (
-        <div className="schedule-section">
-          <div className="section-title">
-            {scheduleGames.length} game{scheduleGames.length !== 1 ? "s" : ""} on {selectedDate}
+        <div className={`schedule-section ${gamesCollapsed && selectedGame ? 'collapsed' : ''}`}>
+          <div className="section-title-row">
+            <div className="section-title">
+              {scheduleGames.length} game{scheduleGames.length !== 1 ? "s" : ""} on {selectedDate}
+            </div>
+            {selectedGame && (
+              <button
+                className="games-collapse-toggle"
+                onClick={() => setGamesCollapsed(prev => !prev)}
+                aria-label={gamesCollapsed ? 'Show all games' : 'Collapse games'}
+              >
+                {gamesCollapsed ? (
+                  <><span className="collapse-toggle-label">Show Games</span><ChevronDown size={16} /></>
+                ) : (
+                  <><span className="collapse-toggle-label">Hide Games</span><ChevronUp size={16} /></>
+                )}
+              </button>
+            )}
           </div>
           <div className="game-cards-container">
             {scheduleGames.map(game => (

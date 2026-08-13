@@ -19,6 +19,7 @@ export default function Standings() {
   const [viewMode, setViewMode] = useState<ViewMode>("division");
   const [sortKey, setSortKey] = useState<SortKey>("points");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [expandedTeams, setExpandedTeams] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     async function fetchStandings() {
@@ -60,7 +61,15 @@ export default function Standings() {
     });
   }, [standings, sortKey, sortOrder]);
 
-  const renderTable = (items: StandingItem[], title?: string, subtitle?: string, showPlayoffLineAfter?: number[]) => {
+  const toggleExpand = (abbr: string) => {
+    setExpandedTeams(prev => {
+      const next = new Set(prev);
+      if (next.has(abbr)) next.delete(abbr); else next.add(abbr);
+      return next;
+    });
+  };
+
+  const renderMobileCards = (items: StandingItem[], title?: string, subtitle?: string, showPlayoffLineAfter?: number[]) => {
     return (
       <div className="standings-card mb-6">
         {title && (
@@ -71,91 +80,164 @@ export default function Standings() {
             </div>
           </div>
         )}
-        <div className="standings-table-wrapper">
-          <table className="standings-table">
-            <thead>
-              <tr>
-                <th className="th-rank">#</th>
-                <th className="th-team">Team</th>
-                <th className="th-num clickable" onClick={() => handleSort("gamesPlayed")}>
-                  GP {sortKey === "gamesPlayed" && (sortOrder === "desc" ? "↓" : "↑")}
-                </th>
-                <th className="th-num clickable" onClick={() => handleSort("wins")}>
-                  W {sortKey === "wins" && (sortOrder === "desc" ? "↓" : "↑")}
-                </th>
-                <th className="th-num">L</th>
-                <th className="th-num">OT</th>
-                <th className="th-num th-pts clickable" onClick={() => handleSort("points")}>
-                  PTS {sortKey === "points" && (sortOrder === "desc" ? "↓" : "↑")}
-                </th>
-                <th className="th-num clickable" onClick={() => handleSort("pointPctg")}>
-                  P% {sortKey === "pointPctg" && (sortOrder === "desc" ? "↓" : "↑")}
-                </th>
-                <th className="th-num hide-mobile clickable" onClick={() => handleSort("regulationWins")}>
-                  RW {sortKey === "regulationWins" && (sortOrder === "desc" ? "↓" : "↑")}
-                </th>
-                <th className="th-num hide-mobile">ROW</th>
-                <th className="th-num hide-mobile clickable" onClick={() => handleSort("goalFor")}>
-                  GF {sortKey === "goalFor" && (sortOrder === "desc" ? "↓" : "↑")}
-                </th>
-                <th className="th-num hide-mobile">GA</th>
-                <th className="th-num hide-mobile clickable" onClick={() => handleSort("goalDifferential")}>
-                  DIFF {sortKey === "goalDifferential" && (sortOrder === "desc" ? "↓" : "↑")}
-                </th>
-                <th className="th-num hide-mobile">STRK</th>
-                <th className="th-num hide-mobile">L10</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((team, idx) => {
-                const teamColor = TEAM_COLORS[team.teamAbbrev?.default] || "var(--accent-primary)";
-                const isPlayoffDivider = showPlayoffLineAfter && showPlayoffLineAfter.includes(idx + 1);
+        <div className="standings-mobile-list">
+          {items.map((team, idx) => {
+            const abbr = team.teamAbbrev?.default;
+            const teamColor = TEAM_COLORS[abbr] || 'var(--accent-primary)';
+            const isExpanded = expandedTeams.has(abbr);
+            const isPlayoffDivider = showPlayoffLineAfter && showPlayoffLineAfter.includes(idx + 1);
 
-                return (
-                  <tr key={team.teamAbbrev?.default || idx} className={`standings-row ${isPlayoffDivider ? "border-playoff-cutoff" : ""}`}>
-                    <td className="td-rank">{idx + 1}</td>
-                    <td className="td-team">
-                      <div className="team-cell">
-                        <img src={team.teamLogo} alt={team.teamName?.default} className="standings-team-logo" />
-                        <span className="team-cell-name">{team.teamName?.default}</span>
-                        <span className="team-cell-abbr">{team.teamAbbrev?.default}</span>
-                        {team.clinchIndicator && (
-                          <span className="clinch-badge" title={`Clinched ${team.clinchIndicator}`}>
-                            {team.clinchIndicator}
-                          </span>
-                        )}
+            return (
+              <div key={abbr || idx} className={`standings-mobile-card ${isPlayoffDivider ? 'border-playoff-cutoff' : ''}`}>
+                <button
+                  className="standings-mobile-card-header"
+                  onClick={() => toggleExpand(abbr)}
+                  aria-expanded={isExpanded}
+                >
+                  <span className="mobile-rank">{idx + 1}</span>
+                  <img src={team.teamLogo} alt={team.teamName?.default} className="standings-team-logo" />
+                  <span className="mobile-team-name">{team.teamName?.default}</span>
+                  <span className="mobile-team-abbr">{abbr}</span>
+                  {team.clinchIndicator && (
+                    <span className="clinch-badge">{team.clinchIndicator}</span>
+                  )}
+                  <span className="mobile-record">{team.wins}-{team.losses}-{team.otLosses}</span>
+                  <span className="mobile-pts" style={{ backgroundColor: teamColor }}>{team.points}<small> PTS</small></span>
+                  <span className={`mobile-expand-icon ${isExpanded ? 'expanded' : ''}`}>›</span>
+                </button>
+                {isExpanded && (
+                  <div className="standings-mobile-card-detail">
+                    <div className="mobile-stat-grid">
+                      <div className="mobile-stat"><span className="mobile-stat-label">GP</span><span className="mobile-stat-value">{team.gamesPlayed}</span></div>
+                      <div className="mobile-stat"><span className="mobile-stat-label">P%</span><span className="mobile-stat-value">{(team.pointPctg || 0).toFixed(3)}</span></div>
+                      <div className="mobile-stat"><span className="mobile-stat-label">RW</span><span className="mobile-stat-value">{team.regulationWins}</span></div>
+                      <div className="mobile-stat"><span className="mobile-stat-label">GF</span><span className="mobile-stat-value">{team.goalFor}</span></div>
+                      <div className="mobile-stat"><span className="mobile-stat-label">GA</span><span className="mobile-stat-value">{team.goalAgainst}</span></div>
+                      <div className="mobile-stat">
+                        <span className="mobile-stat-label">DIFF</span>
+                        <span className="mobile-stat-value" style={{ color: team.goalDifferential > 0 ? 'var(--success)' : team.goalDifferential < 0 ? 'var(--error)' : 'inherit' }}>
+                          {team.goalDifferential > 0 ? `+${team.goalDifferential}` : team.goalDifferential}
+                        </span>
                       </div>
-                    </td>
-                    <td className="td-num">{team.gamesPlayed}</td>
-                    <td className="td-num">{team.wins}</td>
-                    <td className="td-num">{team.losses}</td>
-                    <td className="td-num">{team.otLosses}</td>
-                    <td className="td-num td-pts" style={{ color: teamColor }}>
-                      {team.points}
-                    </td>
-                    <td className="td-num">{(team.pointPctg || 0).toFixed(3)}</td>
-                    <td className="td-num hide-mobile">{team.regulationWins}</td>
-                    <td className="td-num hide-mobile">{team.regulationPlusOtWins}</td>
-                    <td className="td-num hide-mobile">{team.goalFor}</td>
-                    <td className="td-num hide-mobile">{team.goalAgainst}</td>
-                    <td className="td-num hide-mobile" style={{ color: team.goalDifferential > 0 ? "var(--success)" : team.goalDifferential < 0 ? "var(--error)" : "inherit" }}>
-                      {team.goalDifferential > 0 ? `+${team.goalDifferential}` : team.goalDifferential}
-                    </td>
-                    <td className="td-num hide-mobile">
-                      <span className={`streak-tag ${team.streakCode?.toLowerCase()}`}>
-                        {team.streakCode}{team.streakCount}
-                      </span>
-                    </td>
-                    <td className="td-num hide-mobile text-muted">
-                      {team.l10Wins}-{team.l10Losses}-{team.l10OtLosses}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                      <div className="mobile-stat">
+                        <span className="mobile-stat-label">STRK</span>
+                        <span className="mobile-stat-value">
+                          <span className={`streak-tag ${team.streakCode?.toLowerCase()}`}>{team.streakCode}{team.streakCount}</span>
+                        </span>
+                      </div>
+                      <div className="mobile-stat"><span className="mobile-stat-label">L10</span><span className="mobile-stat-value">{team.l10Wins}-{team.l10Losses}-{team.l10OtLosses}</span></div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
+    );
+  };
+
+  const renderTable = (items: StandingItem[], title?: string, subtitle?: string, showPlayoffLineAfter?: number[]) => {
+    return (
+      <>
+        {/* Desktop table - hidden on mobile via CSS */}
+        <div className="standings-card standings-desktop mb-6">
+          {title && (
+            <div className="standings-card-header">
+              <div>
+                <h2 className="standings-card-title">{title}</h2>
+                {subtitle && <span className="standings-card-subtitle">{subtitle}</span>}
+              </div>
+            </div>
+          )}
+          <div className="standings-table-wrapper">
+            <table className="standings-table">
+              <thead>
+                <tr>
+                  <th className="th-team">Team</th>
+                  <th className="th-num clickable" onClick={() => handleSort("gamesPlayed")}>
+                    GP {sortKey === "gamesPlayed" && (sortOrder === "desc" ? "↓" : "↑")}
+                  </th>
+                  <th className="th-num clickable" onClick={() => handleSort("wins")}>
+                    W {sortKey === "wins" && (sortOrder === "desc" ? "↓" : "↑")}
+                  </th>
+                  <th className="th-num">L</th>
+                  <th className="th-num">OT</th>
+                  <th className="th-num th-pts clickable" onClick={() => handleSort("points")}>
+                    PTS {sortKey === "points" && (sortOrder === "desc" ? "↓" : "↑")}
+                  </th>
+                  <th className="th-num clickable" onClick={() => handleSort("pointPctg")}>
+                    P% {sortKey === "pointPctg" && (sortOrder === "desc" ? "↓" : "↑")}
+                  </th>
+                  <th className="th-num clickable" onClick={() => handleSort("regulationWins")}>
+                    RW {sortKey === "regulationWins" && (sortOrder === "desc" ? "↓" : "↑")}
+                  </th>
+                  <th className="th-num clickable" onClick={() => handleSort("goalFor")}>
+                    GF {sortKey === "goalFor" && (sortOrder === "desc" ? "↓" : "↑")}
+                  </th>
+                  <th className="th-num">GA</th>
+                  <th className="th-num clickable" onClick={() => handleSort("goalDifferential")}>
+                    ± {sortKey === "goalDifferential" && (sortOrder === "desc" ? "↓" : "↑")}
+                  </th>
+                  <th className="th-num">STK</th>
+                  <th className="th-num">L10</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((team, idx) => {
+                  const teamColor = TEAM_COLORS[team.teamAbbrev?.default] || "var(--accent-primary)";
+                  const isPlayoffDivider = showPlayoffLineAfter && showPlayoffLineAfter.includes(idx + 1);
+
+                  return (
+                    <tr key={team.teamAbbrev?.default || idx} className={`standings-row ${isPlayoffDivider ? "border-playoff-cutoff" : ""}`}>
+                      <td className="td-team">
+                        <div className="team-cell">
+                          <img src={team.teamLogo} alt={team.teamName?.default} className="standings-team-logo" />
+                          <span className="team-cell-name">{team.teamName?.default}</span>
+                          <span className="team-cell-abbr">{team.teamAbbrev?.default}</span>
+                          {team.clinchIndicator && (
+                            <span className="clinch-badge" title={`Clinched ${team.clinchIndicator}`}>
+                              {team.clinchIndicator}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="td-num">{team.gamesPlayed}</td>
+                      <td className="td-num">{team.wins}</td>
+                      <td className="td-num">{team.losses}</td>
+                      <td className="td-num">{team.otLosses}</td>
+                      <td className="td-num td-pts">
+                        <span className="pts-pill" style={{ backgroundColor: teamColor }}>
+                          {team.points}
+                        </span>
+                      </td>
+                      <td className="td-num">{(team.pointPctg || 0).toFixed(3)}</td>
+                      <td className="td-num">{team.regulationWins}</td>
+                      <td className="td-num">{team.goalFor}</td>
+                      <td className="td-num">{team.goalAgainst}</td>
+                      <td className="td-num" style={{ color: team.goalDifferential > 0 ? "var(--success)" : team.goalDifferential < 0 ? "var(--error)" : "inherit" }}>
+                        {team.goalDifferential > 0 ? `+${team.goalDifferential}` : team.goalDifferential}
+                      </td>
+                      <td className="td-num">
+                        <span className={`streak-tag ${team.streakCode?.toLowerCase()}`}>
+                          {team.streakCode}{team.streakCount}
+                        </span>
+                      </td>
+                      <td className="td-num text-muted">
+                        {team.l10Wins}-{team.l10Losses}-{team.l10OtLosses}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        {/* Mobile cards - shown only on mobile via CSS */}
+        <div className="standings-mobile">
+          {renderMobileCards(items, title, subtitle, showPlayoffLineAfter)}
+        </div>
+      </>
     );
   };
 

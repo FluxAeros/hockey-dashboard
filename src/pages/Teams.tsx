@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { RosterCard, type RosterPlayer } from "../components/RosterCard";
 import { TEAM_COLORS } from "../utils/helpers";
 import { NHL_TEAMS, TEAM_CONFERENCE } from "../utils/teamsData";
@@ -31,6 +31,7 @@ export default function Teams() {
   const [selectedTeam, setSelectedTeam] = useState<string | null>(null);
   const [raisingTeam, setRaisingTeam] = useState<string | null>(null);
   const [conferenceFilter, setConferenceFilter] = useState<"All" | "Eastern" | "Western">("All");
+  const [rosterTab, setRosterTab] = useState<"forwards" | "defensemen" | "goalies">("forwards");
   const hasAnimatedGrid = useRef(false);
   
   const [roster, setRoster] = useState<{
@@ -51,6 +52,7 @@ export default function Teams() {
     setLoading(true);
     setError(null);
     setRoster(null);
+    setRosterTab("forwards");
     try {
       const res = await fetch(`http://127.0.0.1:8000/roster/${abbr}`);
       if (res.status === 429) throw new Error("Too many requests to NHL API. Please wait a moment.");
@@ -236,9 +238,34 @@ export default function Teams() {
 
                 {roster && !loading && (
                   <div className="roster-container mt-8">
-                    {renderRosterSection("Forwards", roster.forwards, 0)}
-                    {renderRosterSection("Defense", roster.defensemen, roster.forwards.length)}
-                    {renderRosterSection("Goalies", roster.goalies, roster.forwards.length + roster.defensemen.length)}
+                    <div className="roster-tabs">
+                      <button
+                        className={`roster-tab-btn${rosterTab === 'forwards' ? ' active' : ''}`}
+                        onClick={() => setRosterTab('forwards')}
+                      >
+                        Forwards <span className="roster-tab-count">{roster.forwards.length}</span>
+                      </button>
+                      <button
+                        className={`roster-tab-btn${rosterTab === 'defensemen' ? ' active' : ''}`}
+                        onClick={() => setRosterTab('defensemen')}
+                      >
+                        Defense <span className="roster-tab-count">{roster.defensemen.length}</span>
+                      </button>
+                      <button
+                        className={`roster-tab-btn${rosterTab === 'goalies' ? ' active' : ''}`}
+                        onClick={() => setRosterTab('goalies')}
+                      >
+                        Goalies <span className="roster-tab-count">{roster.goalies.length}</span>
+                      </button>
+                    </div>
+                    <div className="roster-grid">
+                      {(rosterTab === 'forwards' ? roster.forwards :
+                        rosterTab === 'defensemen' ? roster.defensemen :
+                        roster.goalies
+                      ).map((p, i) => (
+                        <RosterCard key={p.id} player={p} onClick={handleSelectPlayer} index={i} />
+                      ))}
+                    </div>
                   </div>
                 )}
               </motion.div>
