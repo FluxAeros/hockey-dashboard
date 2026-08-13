@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { NHLGame } from "../types";
 import { GameCard } from "../components/GameCard";
+
+const API_BASE = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 import { useNavigate } from "react-router-dom";
 import { formatLocalDateString, shiftDate, todayDateString } from "../utils/helpers";
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -28,7 +30,7 @@ export default function Schedule() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`http://127.0.0.1:8000/schedule/${dateStr}`);
+      const res = await fetch(`${API_BASE}/schedule/${dateStr}`);
       if (!res.ok) throw new Error("Failed to load schedule");
       const data = await res.json();
       

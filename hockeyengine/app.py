@@ -6,6 +6,7 @@ import pandas as pd
 import numpy as np
 import requests
 import joblib
+import os
 
 
 def fix_double_encoding(data):
@@ -24,7 +25,8 @@ app = FastAPI(title="NHL Live Expected Goals Service")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["chelstatz.com"],
+    allow_origins=["chelstatz.com", "http://localhost:5173", "http://localhost:3000"],
+    allow_origin_regex=r"https://.*\.netlify\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -388,4 +390,5 @@ def get_standings_date(date: str):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)

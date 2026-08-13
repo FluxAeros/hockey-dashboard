@@ -9,7 +9,7 @@ import { Scoreboard } from "../components/Scoreboard";
 import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from "lucide-react";
 import { DatePicker } from "../components/DatePicker";
 
-const API_BASE = "http://127.0.0.1:8000";
+const API_BASE = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 const REFRESH_INTERVAL = 30000;
 
 export default function Dashboard() {

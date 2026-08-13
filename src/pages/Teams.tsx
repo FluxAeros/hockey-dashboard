@@ -5,6 +5,8 @@ import { NHL_TEAMS, TEAM_CONFERENCE } from "../utils/teamsData";
 import { ArrowLeft, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
+const API_BASE = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+
 const gridContainerVariants = {
   hidden: { opacity: 0 },
   visible: {
@@ -54,7 +56,7 @@ export default function Teams() {
     setRoster(null);
     setRosterTab("forwards");
     try {
-      const res = await fetch(`http://127.0.0.1:8000/roster/${abbr}`);
+      const res = await fetch(`${API_BASE}/roster/${abbr}`);
       if (res.status === 429) throw new Error("Too many requests to NHL API. Please wait a moment.");
       if (!res.ok) throw new Error("Failed to load roster");
       const data = await res.json();
@@ -75,7 +77,7 @@ export default function Teams() {
     setPlayerDetails(null);
     setPlayerLoading(true);
     try {
-      const res = await fetch(`http://127.0.0.1:8000/player/${player.id}`);
+      const res = await fetch(`${API_BASE}/player/${player.id}`);
       if (res.ok) {
         const data = await res.json();
         setPlayerDetails(data);
