@@ -24,7 +24,7 @@ app = FastAPI(title="NHL Live Expected Goals Service")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["chelstatz.com"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
