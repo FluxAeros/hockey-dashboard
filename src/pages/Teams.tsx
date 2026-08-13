@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from "react";
+import { useState, useRef } from "react";
 import { RosterCard, type RosterPlayer } from "../components/RosterCard";
 import { TEAM_COLORS } from "../utils/helpers";
 import { NHL_TEAMS, TEAM_CONFERENCE } from "../utils/teamsData";
@@ -97,18 +97,6 @@ export default function Teams() {
 
   const closePlayerModal = () => {
     setSelectedPlayer(null);
-  };
-
-  const renderRosterSection = (title: string, players: RosterPlayer[], startIndex: number = 0) => {
-    if (!players.length) return null;
-    return (
-      <div className="roster-section">
-        <h2 className="roster-section-title">{title}</h2>
-        <div className="roster-grid">
-          {players.map((p, i) => <RosterCard key={p.id} player={p} onClick={handleSelectPlayer} index={startIndex + i} />)}
-        </div>
-      </div>
-    );
   };
 
   const activeTeamInfo = selectedTeam ? NHL_TEAMS.find(t => t.teamAbbrev === selectedTeam) : null;
