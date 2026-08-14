@@ -193,6 +193,54 @@ export default function Dashboard() {
 
   const s = stats();
 
+  const [isJumping, setIsJumping] = useState<boolean>(false);
+
+  const handleJumpToNextGameDay = async () => {
+    // 1. Check if there is already a game day in the current 7-day week
+    const nextInWeek = scheduleWeek.find(
+      d => d.date > selectedDate && ((d.numberOfGames ?? 0) > 0 || (d.games && d.games.length > 0))
+    );
+    if (nextInWeek) {
+      setSelectedDate(nextInWeek.date);
+      return;
+    }
+
+    // 2. Otherwise search forward week by week until finding a day with games
+    let cursor = nextStartDate;
+    if (!cursor) return;
+
+    setIsJumping(true);
+    try {
+      let attempts = 0;
+      while (cursor && attempts < 52) {
+        attempts++;
+        const res = await fetch(`${API_BASE}/schedule/${cursor}`);
+        if (!res.ok) break;
+        const data = await res.json() as { games: NHLGame[], gameWeek: any[], nextStartDate?: string };
+        const week = data.gameWeek ?? [];
+
+        const firstGameDay = week.find(
+          d => ((d.numberOfGames ?? 0) > 0 || (d.games && d.games.length > 0))
+        );
+
+        if (firstGameDay) {
+          setSelectedDate(firstGameDay.date);
+          return;
+        }
+
+        if (data.nextStartDate && data.nextStartDate > cursor) {
+          cursor = data.nextStartDate;
+        } else {
+          break;
+        }
+      }
+    } catch (err) {
+      console.error("Failed to find next game day", err);
+    } finally {
+      setIsJumping(false);
+    }
+  };
+
   return (
     <div className="dashboard">
       <div className="dashboard-header">
@@ -215,7 +263,7 @@ export default function Dashboard() {
           </button>
           <button
             onClick={() => fetchSchedule(selectedDate)}
-            disabled={scheduleLoading}
+            disabled={scheduleLoading || isJumping}
             className="btn-primary"
           >
             {scheduleLoading ? "Loading…" : "Refresh"}
@@ -226,15 +274,13 @@ export default function Dashboard() {
       {scheduleError && (
         <div className="alert-error schedule-error">
           <span>{scheduleError}</span>
-          {(scheduleWeek.find(d => d.date > selectedDate && d.numberOfGames > 0) || nextStartDate) && (
+          {(scheduleWeek.some(d => d.date > selectedDate && ((d.numberOfGames ?? 0) > 0 || d.games?.length > 0)) || nextStartDate) && (
             <button 
-              onClick={() => {
-                const nextInWeek = scheduleWeek.find(d => d.date > selectedDate && d.numberOfGames > 0);
-                setSelectedDate(nextInWeek ? nextInWeek.date : nextStartDate!);
-              }}
+              onClick={handleJumpToNextGameDay}
+              disabled={isJumping || scheduleLoading}
               className="btn-primary"
             >
-              Jump to Next Game Day
+              {isJumping ? "Finding next game…" : "Jump to Next Game Day"}
             </button>
           )}
         </div>
