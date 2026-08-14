@@ -586,6 +586,66 @@
   color: var(--text-secondary);
 }
 
+.scoreboard-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.win-prob-section {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: 0.75rem;
+  padding: 0.85rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.win-prob-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.win-prob-title {
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 0.7rem;
+}
+
+.win-prob-labels {
+  display: flex;
+  gap: 1rem;
+  font-size: 0.85rem;
+  font-weight: 800;
+}
+
+.win-prob-track {
+  width: 100%;
+  height: 8px;
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+  overflow: hidden;
+  display: flex;
+}
+
+.win-prob-fill {
+  height: 100%;
+  transition: width 0.4s ease-in-out;
+}
+
+.win-prob-fill.away {
+  border-radius: 4px 0 0 4px;
+}
+
+.win-prob-fill.home {
+  border-radius: 0 4px 4px 0;
+}
+
 /* =========================================
    Hockey Rink
    ========================================= */
@@ -927,11 +987,34 @@
   text-align: left;
   width: 100%;
   will-change: transform;
+  position: relative;
 }
 
 .team-card-btn:hover {
   box-shadow: var(--shadow-lg);
   border-color: var(--text-tertiary) !important;
+}
+
+.team-card-cup-badge {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.6rem;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  color: #fbbf24;
+  font-size: 0.7rem;
+  font-weight: 800;
+  padding: 0.15rem 0.45rem;
+  border-radius: 1rem;
+  letter-spacing: 0.02em;
+}
+
+.cup-icon {
+  color: #fbbf24;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5));
 }
 
 .team-card-content {
@@ -1190,6 +1273,34 @@
   text-shadow: 0 2px 10px rgba(0,0,0,0.5);
 }
 
+.team-hero-cups {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-top: 0.75rem;
+}
+
+.team-hero-cups-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  color: #fbbf24;
+  font-size: 0.85rem;
+  font-weight: 700;
+  padding: 0.25rem 0.65rem;
+  border-radius: 0.5rem;
+  width: fit-content;
+}
+
+.team-hero-cups-years {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+  max-width: 500px;
+}
+
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
@@ -1299,6 +1410,12 @@
   gap: 2rem;
 }
 
+.player-bio-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
 .stat-box {
   display: flex;
   justify-content: space-between;
@@ -1319,23 +1436,26 @@
   font-weight: 600;
 }
 
-.season-stats-container {
+.season-stats-container, .career-stats-container, .last-5-container {
   background: var(--bg-tertiary);
   border-radius: 1rem;
-  padding: 1.5rem;
+  padding: 1.25rem 1.5rem;
 }
 
-.season-stats-container h3 {
-  font-size: 1rem;
+.season-stats-container h3, .career-stats-container h3, .last-5-container h3 {
+  font-size: 0.875rem;
   color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin-bottom: 1rem;
+  font-weight: 700;
 }
 
 .season-stats-row {
   display: flex;
   justify-content: space-around;
+  flex-wrap: wrap;
+  gap: 0.75rem;
 }
 
 .stat-item {
@@ -1343,6 +1463,7 @@
   flex-direction: column;
   align-items: center;
   gap: 0.25rem;
+  min-width: 45px;
 }
 
 .stat-lbl {
@@ -1355,6 +1476,33 @@
   font-size: 1.5rem;
   font-weight: 800;
   color: var(--accent-primary);
+}
+
+.last-5-table-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.last-5-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: center;
+  font-size: 0.825rem;
+}
+
+.last-5-table th {
+  padding: 0.4rem 0.5rem;
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.last-5-table td {
+  padding: 0.45rem 0.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 /* =========================================

@@ -1,8 +1,8 @@
 import { useState, useRef } from "react";
 import { RosterCard, type RosterPlayer } from "../components/RosterCard";
 import { TEAM_COLORS } from "../utils/helpers";
-import { NHL_TEAMS, TEAM_CONFERENCE } from "../utils/teamsData";
-import { ArrowLeft, X } from "lucide-react";
+import { NHL_TEAMS, TEAM_CONFERENCE, STANLEY_CUPS } from "../utils/teamsData";
+import { ArrowLeft, X, Trophy } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
@@ -144,6 +144,7 @@ export default function Teams() {
             <div className="team-selector-grid">
               {filteredTeams.map(team => {
                 const color = TEAM_COLORS[team.teamAbbrev] || 'var(--border-primary)';
+                const cups = STANLEY_CUPS[team.teamAbbrev] || [];
                 return (
                   <motion.button 
                     layoutId={`team-card-${team.teamAbbrev}`}
@@ -160,6 +161,12 @@ export default function Teams() {
                       zIndex: raisingTeam === team.teamAbbrev ? 10 : 1,
                     }}
                   >
+                    {cups.length > 0 && (
+                      <div className="team-card-cup-badge" title={`${cups.length} Stanley Cup${cups.length > 1 ? 's' : ''} (${cups.join(', ')})`}>
+                        <Trophy size={13} className="cup-icon" />
+                        <span>{cups.length}</span>
+                      </div>
+                    )}
                     <motion.div layoutId={`team-content-${team.teamAbbrev}`} className="team-card-content">
                       <motion.img layoutId={`team-logo-${team.teamAbbrev}`} src={team.teamLogo} alt={team.teamName} className="team-logo-img" />
                       <motion.div layoutId={`team-text-${team.teamAbbrev}`} className="team-card-text">
@@ -216,6 +223,17 @@ export default function Teams() {
                   <h1 className="team-hero-mascot" style={{ color: activeColor }}>
                     {activeTeamInfo?.teamName.split(' ').slice(-1).join(' ')}
                   </h1>
+                  {selectedTeam && (STANLEY_CUPS[selectedTeam]?.length ?? 0) > 0 && (
+                    <div className="team-hero-cups">
+                      <div className="team-hero-cups-badge">
+                        <Trophy size={16} className="cup-icon" />
+                        <span>{STANLEY_CUPS[selectedTeam].length} Stanley Cup{STANLEY_CUPS[selectedTeam].length > 1 ? 's' : ''}</span>
+                      </div>
+                      <span className="team-hero-cups-years">
+                        {STANLEY_CUPS[selectedTeam].join(', ')}
+                      </span>
+                    </div>
+                  )}
                 </motion.div>
               </motion.div>
               
@@ -311,26 +329,37 @@ export default function Teams() {
                   <div className="text-secondary p-4">Loading player details...</div>
                 ) : playerDetails ? (
                   <div className="player-stats-grid">
-                    <div className="stat-box">
-                      <label>Height</label>
-                      <div className="val">{playerDetails.heightInInches ? `${Math.floor(playerDetails.heightInInches / 12)}'${playerDetails.heightInInches % 12}"` : '--'}</div>
-                    </div>
-                    <div className="stat-box">
-                      <label>Weight</label>
-                      <div className="val">{playerDetails.weightInPounds ? `${playerDetails.weightInPounds} lbs` : '--'}</div>
-                    </div>
-                    <div className="stat-box">
-                      <label>Birthplace</label>
-                      <div className="val">{playerDetails.birthCity?.default || '--'}</div>
-                    </div>
-                    <div className="stat-box">
-                      <label>Shoots</label>
-                      <div className="val">{playerDetails.shootsCatches || '--'}</div>
+                    <div className="player-bio-grid">
+                      <div className="stat-box">
+                        <label>Height</label>
+                        <div className="val">{playerDetails.heightInInches ? `${Math.floor(playerDetails.heightInInches / 12)}'${playerDetails.heightInInches % 12}"` : '--'}</div>
+                      </div>
+                      <div className="stat-box">
+                        <label>Weight</label>
+                        <div className="val">{playerDetails.weightInPounds ? `${playerDetails.weightInPounds} lbs` : '--'}</div>
+                      </div>
+                      <div className="stat-box">
+                        <label>Birthplace</label>
+                        <div className="val">{playerDetails.birthCity?.default || '--'}{playerDetails.birthStateProvince ? `, ${playerDetails.birthStateProvince.default}` : ''}</div>
+                      </div>
+                      <div className="stat-box">
+                        <label>Shoots</label>
+                        <div className="val">{playerDetails.shootsCatches === 'L' ? 'Left' : playerDetails.shootsCatches === 'R' ? 'Right' : playerDetails.shootsCatches || '--'}</div>
+                      </div>
+                      {playerDetails.draftDetails && (
+                        <div className="stat-box">
+                          <label>Draft</label>
+                          <div className="val">
+                            {playerDetails.draftDetails.year} R{playerDetails.draftDetails.round} (#{playerDetails.draftDetails.overallPick}) {playerDetails.draftDetails.teamAbbrev}
+                          </div>
+                        </div>
+                      )}
                     </div>
                     
+                    {/* Current Season Featured Stats */}
                     {playerDetails.seasonTotals && playerDetails.seasonTotals[0] && (
                       <div className="season-stats-container">
-                        <h3>Current Season</h3>
+                        <h3>Current Season ({playerDetails.seasonTotals[0].season?.toString().slice(0, 4) || '2024'}-{(playerDetails.seasonTotals[0].season?.toString().slice(4) || '25')})</h3>
                         <div className="season-stats-row">
                           <div className="stat-item">
                             <span className="stat-lbl">GP</span>
@@ -340,22 +369,42 @@ export default function Teams() {
                             <>
                               <div className="stat-item">
                                 <span className="stat-lbl">G</span>
-                                <span className="stat-val">{playerDetails.seasonTotals[0].goals || 0}</span>
+                                <span className="stat-val">{playerDetails.seasonTotals[0].goals ?? 0}</span>
                               </div>
                               <div className="stat-item">
                                 <span className="stat-lbl">A</span>
-                                <span className="stat-val">{playerDetails.seasonTotals[0].assists || 0}</span>
+                                <span className="stat-val">{playerDetails.seasonTotals[0].assists ?? 0}</span>
                               </div>
                               <div className="stat-item">
                                 <span className="stat-lbl">PTS</span>
-                                <span className="stat-val">{playerDetails.seasonTotals[0].points || 0}</span>
+                                <span className="stat-val">{playerDetails.seasonTotals[0].points ?? 0}</span>
+                              </div>
+                              <div className="stat-item">
+                                <span className="stat-lbl">+/-</span>
+                                <span className="stat-val" style={{ color: (playerDetails.seasonTotals[0].plusMinus ?? 0) > 0 ? 'var(--success)' : (playerDetails.seasonTotals[0].plusMinus ?? 0) < 0 ? 'var(--error)' : 'inherit' }}>
+                                  {(playerDetails.seasonTotals[0].plusMinus ?? 0) > 0 ? `+${playerDetails.seasonTotals[0].plusMinus}` : playerDetails.seasonTotals[0].plusMinus ?? 0}
+                                </span>
+                              </div>
+                              <div className="stat-item">
+                                <span className="stat-lbl">SOG</span>
+                                <span className="stat-val">{playerDetails.seasonTotals[0].shots ?? '--'}</span>
+                              </div>
+                              <div className="stat-item">
+                                <span className="stat-lbl">SH%</span>
+                                <span className="stat-val">
+                                  {playerDetails.seasonTotals[0].shootingPctg ? `${(playerDetails.seasonTotals[0].shootingPctg * 100).toFixed(1)}%` : '--'}
+                                </span>
                               </div>
                             </>
                           ) : (
                             <>
                               <div className="stat-item">
                                 <span className="stat-lbl">W</span>
-                                <span className="stat-val">{playerDetails.seasonTotals[0].wins || 0}</span>
+                                <span className="stat-val">{playerDetails.seasonTotals[0].wins ?? 0}</span>
+                              </div>
+                              <div className="stat-item">
+                                <span className="stat-lbl">L</span>
+                                <span className="stat-val">{playerDetails.seasonTotals[0].losses ?? 0}</span>
                               </div>
                               <div className="stat-item">
                                 <span className="stat-lbl">SV%</span>
@@ -365,8 +414,125 @@ export default function Teams() {
                                 <span className="stat-lbl">GAA</span>
                                 <span className="stat-val">{playerDetails.seasonTotals[0].goalsAgainstAvg ? (playerDetails.seasonTotals[0].goalsAgainstAvg).toFixed(2) : '--'}</span>
                               </div>
+                              <div className="stat-item">
+                                <span className="stat-lbl">SO</span>
+                                <span className="stat-val">{playerDetails.seasonTotals[0].shutouts ?? 0}</span>
+                              </div>
                             </>
                           )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Career Totals */}
+                    {playerDetails.careerTotals?.regularSeason && (
+                      <div className="career-stats-container">
+                        <h3>NHL Career Totals</h3>
+                        <div className="season-stats-row">
+                          <div className="stat-item">
+                            <span className="stat-lbl">GP</span>
+                            <span className="stat-val">{playerDetails.careerTotals.regularSeason.gamesPlayed}</span>
+                          </div>
+                          {selectedPlayer.positionCode !== 'G' ? (
+                            <>
+                              <div className="stat-item">
+                                <span className="stat-lbl">G</span>
+                                <span className="stat-val">{playerDetails.careerTotals.regularSeason.goals ?? 0}</span>
+                              </div>
+                              <div className="stat-item">
+                                <span className="stat-lbl">A</span>
+                                <span className="stat-val">{playerDetails.careerTotals.regularSeason.assists ?? 0}</span>
+                              </div>
+                              <div className="stat-item">
+                                <span className="stat-lbl">PTS</span>
+                                <span className="stat-val">{playerDetails.careerTotals.regularSeason.points ?? 0}</span>
+                              </div>
+                              <div className="stat-item">
+                                <span className="stat-lbl">+/-</span>
+                                <span className="stat-val" style={{ color: (playerDetails.careerTotals.regularSeason.plusMinus ?? 0) > 0 ? 'var(--success)' : (playerDetails.careerTotals.regularSeason.plusMinus ?? 0) < 0 ? 'var(--error)' : 'inherit' }}>
+                                  {(playerDetails.careerTotals.regularSeason.plusMinus ?? 0) > 0 ? `+${playerDetails.careerTotals.regularSeason.plusMinus}` : playerDetails.careerTotals.regularSeason.plusMinus ?? 0}
+                                </span>
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <div className="stat-item">
+                                <span className="stat-lbl">W</span>
+                                <span className="stat-val">{playerDetails.careerTotals.regularSeason.wins ?? 0}</span>
+                              </div>
+                              <div className="stat-item">
+                                <span className="stat-lbl">SV%</span>
+                                <span className="stat-val">{playerDetails.careerTotals.regularSeason.savePctg ? (playerDetails.careerTotals.regularSeason.savePctg).toFixed(3) : '--'}</span>
+                              </div>
+                              <div className="stat-item">
+                                <span className="stat-lbl">GAA</span>
+                                <span className="stat-val">{playerDetails.careerTotals.regularSeason.goalsAgainstAvg ? (playerDetails.careerTotals.regularSeason.goalsAgainstAvg).toFixed(2) : '--'}</span>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Last 5 Games Log */}
+                    {playerDetails.last5Games && playerDetails.last5Games.length > 0 && (
+                      <div className="last-5-container">
+                        <h3>Last 5 Games</h3>
+                        <div className="last-5-table-wrapper">
+                          <table className="last-5-table">
+                            <thead>
+                              <tr>
+                                <th>Date</th>
+                                <th>OPP</th>
+                                {selectedPlayer.positionCode !== 'G' ? (
+                                  <>
+                                    <th>G</th>
+                                    <th>A</th>
+                                    <th>PTS</th>
+                                    <th>+/-</th>
+                                    <th>SOG</th>
+                                    <th>TOI</th>
+                                  </>
+                                ) : (
+                                  <>
+                                    <th>DEC</th>
+                                    <th>GA</th>
+                                    <th>SA</th>
+                                    <th>SV%</th>
+                                    <th>TOI</th>
+                                  </>
+                                )}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {playerDetails.last5Games.map((g: any, idx: number) => (
+                                <tr key={g.gameId || idx}>
+                                  <td>{g.gameDate?.slice(5) || '--'}</td>
+                                  <td className="font-semibold">{g.opponentAbbrev || '--'}</td>
+                                  {selectedPlayer.positionCode !== 'G' ? (
+                                    <>
+                                      <td>{g.goals ?? 0}</td>
+                                      <td>{g.assists ?? 0}</td>
+                                      <td className="font-bold text-accent">{g.points ?? 0}</td>
+                                      <td style={{ color: (g.plusMinus ?? 0) > 0 ? 'var(--success)' : (g.plusMinus ?? 0) < 0 ? 'var(--error)' : 'inherit' }}>
+                                        {(g.plusMinus ?? 0) > 0 ? `+${g.plusMinus}` : g.plusMinus ?? 0}
+                                      </td>
+                                      <td>{g.shots ?? 0}</td>
+                                      <td className="text-secondary">{g.toi || '--'}</td>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <td>{g.decision || '--'}</td>
+                                      <td>{g.goalsAgainst ?? 0}</td>
+                                      <td>{g.shotsAgainst ?? 0}</td>
+                                      <td>{g.savePctg ? (g.savePctg).toFixed(3) : '--'}</td>
+                                      <td className="text-secondary">{g.toi || '--'}</td>
+                                    </>
+                                  )}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
                         </div>
                       </div>
                     )}

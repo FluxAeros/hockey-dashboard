@@ -39,16 +39,27 @@ SHOT_TYPE_CATEGORIES = ['backhand', 'deflected', 'slap', 'snap', 'tip-in', 'wrap
 
 BASE_DIR = Path(__file__).resolve().parent
 MODEL_PATH = BASE_DIR / "xg_model_gb.pkl"
+WIN_PROB_MODEL_PATH = BASE_DIR / "win_prob_model.pkl"
 
 try:
     model = joblib.load(MODEL_PATH)
-    print(f"Loaded model from: {MODEL_PATH}")
+    print(f"Loaded xG model from: {MODEL_PATH}")
 except FileNotFoundError:
-    print(f"ERROR: Model file not found: {MODEL_PATH}")
+    print(f"ERROR: xG Model file not found: {MODEL_PATH}")
     model = None
 except Exception as e:
-    print(f"ERROR loading model: {type(e).__name__}: {e}")
+    print(f"ERROR loading xG model: {type(e).__name__}: {e}")
     model = None
+
+try:
+    win_prob_model = joblib.load(WIN_PROB_MODEL_PATH)
+    print(f"Loaded Win Probability model from: {WIN_PROB_MODEL_PATH}")
+except FileNotFoundError:
+    print(f"Notice: Win Probability model file not found at {WIN_PROB_MODEL_PATH}")
+    win_prob_model = None
+except Exception as e:
+    print(f"Notice: Could not load win probability model: {type(e).__name__}: {e}")
+    win_prob_model = None
 
 def time_to_seconds(time_str):
     if not time_str: return 0
@@ -168,14 +179,68 @@ def get_live_game_xg(game_id: str):
         
         for idx, prob in enumerate(probabilities):
             processed_shots[idx]['xg'] = float(prob)
+
+        # Calculate in-game Win Probability using win_prob_model if available
+        win_probability = None
+        try:
+            home_team_id = response.json().get('homeTeam', {}).get('id')
+            away_team_id = response.json().get('awayTeam', {}).get('id')
             
-        return fix_double_encoding({"shots": processed_shots})
+            home_goals = sum(1 for s in processed_shots if s.get('is_goal') == 1 and s.get('team_id') == home_team_id)
+            away_goals = sum(1 for s in processed_shots if s.get('is_goal') == 1 and s.get('team_id') == away_team_id)
+            home_xg = sum(s.get('xg', 0.0) for s in processed_shots if s.get('team_id') == home_team_id)
+            away_xg = sum(s.get('xg', 0.0) for s in processed_shots if s.get('team_id') == away_team_id)
+            home_shots = sum(1 for s in processed_shots if s.get('team_id') == home_team_id)
+            away_shots = sum(1 for s in processed_shots if s.get('team_id') == away_team_id)
+            
+            # Extract latest period and time remaining
+            last_play = plays[-1] if plays else {}
+            period = last_play.get('periodDescriptor', {}).get('number', 1)
+            time_in_period = time_to_seconds(last_play.get('timeInPeriod', '00:00'))
+            seconds_elapsed = min(3600, (period - 1) * 1200 + time_in_period)
+            seconds_remaining = max(0, 3600 - seconds_elapsed)
+            
+            situation_code = str(last_play.get('situationCode', '1551'))
+            away_skaters = int(situation_code[1]) if len(situation_code) == 4 else 5
+            home_skaters = int(situation_code[2]) if len(situation_code) == 4 else 5
+            manpower_diff = home_skaters - away_skaters
+            
+            score_diff = home_goals - away_goals
+            xg_diff = home_xg - away_xg
+            shots_diff = home_shots - away_shots
+            
+            if win_prob_model:
+                features_input = np.array([[score_diff, seconds_remaining, min(period, 3), manpower_diff, xg_diff, shots_diff]])
+                home_prob = float(win_prob_model.predict_proba(features_input)[0][1]) * 100
+            else:
+                # Analytical logistic fallback
+                logit = 0.14 + (score_diff * 1.35) + (xg_diff * 0.55) + (shots_diff * 0.05)
+                home_prob = (1.0 / (1.0 + np.exp(-logit))) * 100
+                
+            home_prob = min(99.5, max(0.5, round(home_prob, 1)))
+            away_prob = round(100.0 - home_prob, 1)
+            
+            win_probability = {
+                "homeProb": home_prob,
+                "awayProb": away_prob
+            }
+        except Exception as wp_err:
+            print(f"Notice: Win probability calculation bypassed: {wp_err}")
+            
+        return fix_double_encoding({
+            "shots": processed_shots,
+            "winProbability": win_probability
+        })
 
     except Exception as e:
         tb = traceback.format_exc()
         print("=== /game ERROR ===")
         print(tb)
         raise HTTPException(status_code=500, detail=f"{type(e).__name__}: {e}")
+
+@app.get("/game/{game_id}/win-prob")
+def get_game_win_prob(game_id: str):
+    return get_game(game_id).get("winProbability", {})
 
 @app.get("/schedule/{date}")
 def get_schedule(date: str):

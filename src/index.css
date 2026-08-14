@@ -41,6 +41,74 @@
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+  /* Firefox */
+  scrollbar-width: thin;
+  scrollbar-color: #334155 transparent;
+}
+
+/* =========================================
+   Custom Scrollbars (WebKit: Chrome / Safari / Edge)
+   ========================================= */
+
+/* Track */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-track-piece {
+  background: transparent;
+}
+
+/* Thumb */
+::-webkit-scrollbar-thumb {
+  background: #334155; /* --bg-tertiary / Slate 700 */
+  border-radius: 99px;
+  transition: background 0.2s;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #38BDF8; /* --accent-primary / Sky 400 */
+}
+
+::-webkit-scrollbar-thumb:active {
+  background: #0284C7; /* --accent-secondary / Sky 600 */
+}
+
+/* Corner where vertical + horizontal scrollbars meet */
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Slightly wider scrollbar for the main content area */
+.main-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.main-content::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+}
+
+/* Thinner, subtler scrollbar for inner panels (modal, table wrapper) */
+.player-modal::-webkit-scrollbar,
+.last-5-table-wrapper::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+.player-modal::-webkit-scrollbar-thumb,
+.last-5-table-wrapper::-webkit-scrollbar-thumb {
+  background: #475569; /* Slate 600 — slightly lighter for inner panels */
+  border-radius: 99px;
+}
+
+.player-modal::-webkit-scrollbar-thumb:hover,
+.last-5-table-wrapper::-webkit-scrollbar-thumb:hover {
+  background: #38BDF8;
 }
 
 body {

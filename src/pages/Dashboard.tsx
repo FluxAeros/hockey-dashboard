@@ -80,6 +80,8 @@ export default function Dashboard() {
     setPollingActive(false);
   }, []);
 
+  const [winProbability, setWinProbability] = useState<{ homeProb: number, awayProb: number } | null>(null);
+
   const fetchGameData = useCallback(async (game: NHLGame) => {
     const gid = String(game.id);
     try {
@@ -90,8 +92,13 @@ export default function Dashboard() {
       ]);
 
       if (!xgRes.ok) throw new Error(`xG API error ${xgRes.status}`);
-      const xgData = await xgRes.json() as { shots: Shot[] };
+      const xgData = await xgRes.json() as { shots: Shot[], winProbability?: { homeProb: number, awayProb: number } };
       const newShots = xgData.shots ?? [];
+      if (xgData.winProbability) {
+        setWinProbability(xgData.winProbability);
+      } else {
+        setWinProbability(null);
+      }
       
       let actualHomeId: number | null = null; 
 
@@ -356,6 +363,7 @@ export default function Dashboard() {
           awayTeamAbbr={awayTeamAbbr} 
           homeTeamName={homeTeamName} 
           awayTeamName={awayTeamName} 
+          winProbability={winProbability}
         />
       )}
 
