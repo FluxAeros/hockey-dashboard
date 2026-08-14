@@ -1,6 +1,5 @@
 import { createContext, useContext, useState, useEffect, type ReactNode, useCallback } from "react";
-
-const API_BASE = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+import { API_BASE } from "../utils/api";
 
 export interface User {
   id: number;
@@ -169,6 +168,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     
     // Optimistic UI update
     setFavorites(updated);
+    setUser((prev) => (prev ? { ...prev, favorites: updated } : prev));
     localStorage.setItem(LOCAL_FAVORITES_KEY, JSON.stringify(updated));
 
     if (token) {
@@ -184,6 +184,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (res.ok) {
           const data = await res.json();
           setFavorites(data.favorites);
+          setUser((prev) => (prev ? { ...prev, favorites: data.favorites } : prev));
+          return;
         }
       } catch (e) {
         console.error("Failed to sync favorite toggle with backend", e);

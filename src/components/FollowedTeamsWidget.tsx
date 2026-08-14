@@ -1,12 +1,11 @@
 import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
-import { Star, Flame, Trophy, Calendar, Sparkles } from "lucide-react";
+import { Star, Flame, Trophy, Calendar, Sparkles, ChevronDown, ChevronUp } from "lucide-react";
 import { NHL_TEAMS_METADATA } from "../utils/nhlDivisions";
 import { formatLocalDateString } from "../utils/helpers";
+import { API_BASE } from "../utils/api";
 import type { StandingItem } from "../types";
-
-const API_BASE = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 
 interface TailoredFeedData {
   favorites: string[];
@@ -15,11 +14,20 @@ interface TailoredFeedData {
   standings: StandingItem[];
 }
 
-export function FollowedTeamsWidget({ onSelectGame }: { onSelectGame?: (game: any, date: string) => void }) {
+interface FollowedTeamsWidgetProps {
+  onSelectGame?: (game: any, date: string) => void;
+  isGameSelected?: boolean;
+}
+
+export function FollowedTeamsWidget({ onSelectGame, isGameSelected = false }: FollowedTeamsWidgetProps) {
   const { user, favorites, toggleFavorite, openAuthModal } = useAuth();
   const navigate = useNavigate();
   const [feedData, setFeedData] = useState<TailoredFeedData | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
+  const [isManuallyExpanded, setIsManuallyExpanded] = useState<boolean | null>(null);
+
+  // Auto-collapse when a game is selected, unless user manually toggled it
+  const isCollapsed = isManuallyExpanded !== null ? !isManuallyExpanded : isGameSelected;
 
   const fetchFeed = useCallback(async () => {
     if (favorites.length === 0) {
@@ -93,6 +101,8 @@ export function FollowedTeamsWidget({ onSelectGame }: { onSelectGame?: (game: an
   }, [fetchFeed]);
 
   if (favorites.length === 0) {
+    if (isGameSelected) return null; // Don't show empty promo if user is actively watching a game
+
     return (
       <div className="followed-hub-empty">
         <div className="followed-hub-empty-content">
@@ -121,49 +131,63 @@ export function FollowedTeamsWidget({ onSelectGame }: { onSelectGame?: (game: an
   }
 
   return (
-    <div className="followed-hub">
+    <div className={`followed-hub ${isCollapsed ? 'followed-hub-collapsed' : ''}`}>
       <div className="followed-hub-header">
-        <div className="followed-hub-title-group">
+        <div className="followed-hub-title-group" onClick={() => setIsManuallyExpanded(isCollapsed)} role="button" tabIndex={0}>
           <Star className="text-amber fill-amber" size={18} />
           <h2 className="followed-hub-title">
-            {user ? `${user.username}'s Followed Teams` : "Your Followed Teams"}
+            {user ? `${user.username}'s Teams` : "Your Followed Teams"}
           </h2>
           <span className="badge-count">{favorites.length}</span>
         </div>
 
-        <div className="followed-hub-chips">
-          {favorites.map((abbr) => {
-            const meta = NHL_TEAMS_METADATA[abbr];
-            return (
-              <span key={abbr} className="followed-chip" title={meta?.name || abbr}>
-                <img
-                  src={`https://assets.nhle.com/logos/nhl/svg/${abbr}_light.svg`}
-                  alt={abbr}
-                  className="followed-chip-logo"
-                  onError={(e) => {
-                    (e.target as HTMLElement).style.display = "none";
-                  }}
-                />
-                <span className="font-semibold">{abbr}</span>
-                <button
-                  className="chip-remove"
-                  onClick={() => toggleFavorite(abbr)}
-                  title={`Unfollow ${abbr}`}
-                >
-                  &times;
-                </button>
-              </span>
-            );
-          })}
-          <button className="add-team-chip" onClick={() => navigate("/teams", { state: { fromAddFollowed: true } })}>
-            + Add Team
+        <div className="followed-hub-chips-wrapper">
+          <div className="followed-hub-chips">
+            {favorites.map((abbr) => {
+              const meta = NHL_TEAMS_METADATA[abbr];
+              return (
+                <span key={abbr} className="followed-chip" title={meta?.name || abbr}>
+                  <img
+                    src={`https://assets.nhle.com/logos/nhl/svg/${abbr}_light.svg`}
+                    alt={abbr}
+                    className="followed-chip-logo"
+                    onError={(e) => {
+                      (e.target as HTMLElement).style.display = "none";
+                    }}
+                  />
+                  <span className="font-semibold">{abbr}</span>
+                  <button
+                    className="chip-remove"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleFavorite(abbr);
+                    }}
+                    title={`Unfollow ${abbr}`}
+                  >
+                    &times;
+                  </button>
+                </span>
+              );
+            })}
+            <button className="add-team-chip" onClick={() => navigate("/teams", { state: { fromAddFollowed: true } })}>
+              + Add Team
+            </button>
+          </div>
+
+          <button
+            className="followed-hub-toggle-btn"
+            onClick={() => setIsManuallyExpanded(isCollapsed)}
+            title={isCollapsed ? "Expand Hub" : "Collapse Hub"}
+            aria-label={isCollapsed ? "Expand Hub" : "Collapse Hub"}
+          >
+            {isCollapsed ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
           </button>
         </div>
       </div>
 
-      {loading && <div className="p-4 text-xs text-secondary">Updating feed for followed teams...</div>}
+      {!isCollapsed && loading && <div className="p-3 text-xs text-secondary">Updating feed for followed teams...</div>}
 
-      {feedData && (
+      {!isCollapsed && feedData && (
         <div className="followed-hub-grid">
           {/* Upcoming Games Column */}
           <div className="followed-card">

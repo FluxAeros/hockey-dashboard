@@ -10,8 +10,8 @@ import { FollowedTeamsWidget } from "../components/FollowedTeamsWidget";
 import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from "lucide-react";
 import { DatePicker } from "../components/DatePicker";
 import { NHL_TEAMS_METADATA } from "../utils/nhlDivisions";
+import { API_BASE } from "../utils/api";
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 const REFRESH_INTERVAL = 30000;
 
 function resolveTeamFullName(team: any, fallbackAbbr: string): string {
@@ -338,6 +338,7 @@ export default function Dashboard() {
 
       {/* Tailored Followed Teams Feed */}
       <FollowedTeamsWidget
+        isGameSelected={selectedGame !== null}
         onSelectGame={(game, date) => {
           if (date && date !== selectedDate) {
             setSelectedDate(date);

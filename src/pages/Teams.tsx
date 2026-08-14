@@ -7,7 +7,7 @@ import { ArrowLeft, X, Trophy, Star } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "../context/AuthContext";
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+import { API_BASE } from "../utils/api";
 
 const gridContainerVariants = {
   hidden: { opacity: 0 },
@@ -80,10 +80,10 @@ export default function Teams() {
     }
   };
 
-  const handleCardClick = (abbr: string) => {
+  const handleCardClick = async (abbr: string) => {
     if (isSelectingForFollow) {
       if (!isFavorite(abbr)) {
-        toggleFavorite(abbr);
+        await toggleFavorite(abbr);
       }
       navigate("/");
       return;
@@ -205,9 +205,9 @@ export default function Teams() {
                     )}
                     <button
                       className={`team-card-fav-btn ${isFavorite(team.teamAbbrev) ? 'active' : ''}`}
-                      onClick={(e) => {
+                      onClick={async (e) => {
                         e.stopPropagation();
-                        toggleFavorite(team.teamAbbrev);
+                        await toggleFavorite(team.teamAbbrev);
                         if (isSelectingForFollow) {
                           navigate("/");
                         }

@@ -7,7 +7,7 @@ import { ChevronLeft, ChevronRight, Filter, Star, X } from "lucide-react";
 import { NHL_TEAMS_METADATA, CONFERENCES, DIVISIONS } from "../utils/nhlDivisions";
 import { useAuth } from "../context/AuthContext";
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+import { API_BASE } from "../utils/api";
 
 interface GameDay {
   date: string;

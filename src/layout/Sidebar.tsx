@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { Activity, Calendar, Trophy, Users, User as UserIcon, LogIn, LogOut, Star } from "lucide-react";
+import { Activity, Calendar, Trophy, Users, LogIn, LogOut, Star } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 
@@ -24,7 +24,6 @@ const NAV_LINKS = [
 export function Sidebar() {
   const isMobile = useMobile();
   const { user, favorites, openAuthModal, logout } = useAuth();
-  const [showUserMenu, setShowUserMenu] = useState(false);
 
   if (isMobile) {
     return (
@@ -40,32 +39,6 @@ export function Sidebar() {
             <span className="bottom-nav-label">{label}</span>
           </NavLink>
         ))}
-        <button
-          className="bottom-nav-link account-nav-btn"
-          onClick={() => (user ? setShowUserMenu(!showUserMenu) : openAuthModal("login"))}
-        >
-          <UserIcon size={22} />
-          <span className="bottom-nav-label">{user ? user.username : "Account"}</span>
-        </button>
-
-        {showUserMenu && user && (
-          <div className="mobile-user-popover">
-            <div className="user-popover-header">
-              <span className="font-bold">{user.username}</span>
-              <span className="text-xs text-secondary">{favorites.length} team(s) followed</span>
-            </div>
-            <button
-              className="user-popover-logout"
-              onClick={() => {
-                logout();
-                setShowUserMenu(false);
-              }}
-            >
-              <LogOut size={14} />
-              <span>Log Out</span>
-            </button>
-          </div>
-        )}
       </nav>
     );
   }

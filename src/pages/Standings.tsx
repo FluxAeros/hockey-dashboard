@@ -7,7 +7,7 @@ import { motion } from "framer-motion";
 type ViewMode = "division" | "conference" | "league" | "wildcard";
 type SortKey = "points" | "pointPctg" | "wins" | "regulationWins" | "goalDifferential" | "goalFor" | "gamesPlayed";
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+import { API_BASE } from "../utils/api";
 
 const DIVISION_ORDER = ["Atlantic", "Metropolitan", "Central", "Pacific"];
 const CONFERENCE_ORDER = ["Eastern", "Western"];
