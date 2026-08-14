@@ -9,9 +9,22 @@ import { Scoreboard } from "../components/Scoreboard";
 import { FollowedTeamsWidget } from "../components/FollowedTeamsWidget";
 import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from "lucide-react";
 import { DatePicker } from "../components/DatePicker";
+import { NHL_TEAMS_METADATA } from "../utils/nhlDivisions";
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 const REFRESH_INTERVAL = 30000;
+
+function resolveTeamFullName(team: any, fallbackAbbr: string): string {
+  if (team?.name?.default) return team.name.default;
+  if (team?.placeName?.default && team?.commonName?.default) {
+    return `${team.placeName.default} ${team.commonName.default}`;
+  }
+  const abbr = (team?.abbrev || fallbackAbbr || "").toUpperCase();
+  if (abbr && NHL_TEAMS_METADATA[abbr]) {
+    return NHL_TEAMS_METADATA[abbr].name;
+  }
+  return team?.commonName?.default || abbr || "Team";
+}
 
 export default function Dashboard() {
   const location = useLocation();
@@ -122,12 +135,12 @@ export default function Dashboard() {
         };
         if (boxData.homeTeam) {
           actualHomeId = boxData.homeTeam.id;
-          setHomeTeamName(boxData.homeTeam.name?.default ?? boxData.homeTeam.abbrev ?? "Home");
+          setHomeTeamName(resolveTeamFullName(boxData.homeTeam, boxData.homeTeam.abbrev ?? "Home"));
           setHomeTeamAbbr(boxData.homeTeam.abbrev ?? "HOME");
           setHomeTeamId(actualHomeId);
         }
         if (boxData.awayTeam) {
-          setAwayTeamName(boxData.awayTeam.name?.default ?? boxData.awayTeam.abbrev ?? "Away");
+          setAwayTeamName(resolveTeamFullName(boxData.awayTeam, boxData.awayTeam.abbrev ?? "Away"));
           setAwayTeamAbbr(boxData.awayTeam.abbrev ?? "AWAY");
         }
         if (boxData.gameState) {
@@ -204,8 +217,8 @@ export default function Dashboard() {
     setGamesCollapsed(true);
     setShots([]);
     setHomeTeamId(null);
-    setHomeTeamName(game.homeTeam?.name?.default ?? game.homeTeam?.abbrev ?? "Home");
-    setAwayTeamName(game.awayTeam?.name?.default ?? game.awayTeam?.abbrev ?? "Away");
+    setHomeTeamName(resolveTeamFullName(game.homeTeam, game.homeTeam?.abbrev ?? "Home"));
+    setAwayTeamName(resolveTeamFullName(game.awayTeam, game.awayTeam?.abbrev ?? "Away"));
     setHomeTeamAbbr(game.homeTeam?.abbrev ?? "HOME");
     setAwayTeamAbbr(game.awayTeam?.abbrev ?? "AWAY");
     setGameStatus("loading");
