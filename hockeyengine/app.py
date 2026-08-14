@@ -362,10 +362,14 @@ async def get_live_game_xg(game_id: str):
         url = f"https://api-web.nhle.com/v1/gamecenter/{gid}/play-by-play"
         res = await client.get(url)
         if res.status_code != 200:
-            raise HTTPException(status_code=404, detail="Game not found or NHL API unreachable.")
+            return fix_double_encoding({
+                "shots": [],
+                "winProbability": None,
+                "gameState": "FUT"
+            })
 
         raw_json = res.json()
-        game_state = raw_json.get("gameState", "")
+        game_state = raw_json.get("gameState", "FUT")
         plays = raw_json.get('plays', [])
         processed_shots = process_game_plays(plays)
 

@@ -45,14 +45,16 @@ export default function Dashboard() {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const fetchSchedule = useCallback(async (date: string) => {
+  const fetchSchedule = useCallback(async (date: string, keepSelected: boolean = false) => {
     setScheduleLoading(true);
     setScheduleError(null);
-    setScheduleGames([]);
-    setSelectedGame(null);
-    setShots([]);
-    setGameStatus("idle");
-    setStatusMsg("");
+    if (!keepSelected) {
+      setScheduleGames([]);
+      setSelectedGame(null);
+      setShots([]);
+      setGameStatus("idle");
+      setStatusMsg("");
+    }
     setScheduleWeek([]);
     setNextStartDate(null);
     try {
@@ -64,7 +66,7 @@ export default function Dashboard() {
       setScheduleWeek(data.gameWeek ?? []);
       setNextStartDate(data.nextStartDate ?? null);
       if (!games.length) setScheduleError("No games scheduled for this date.");
-    } catch (e) {
+    } catch {
       setScheduleError("Could not load schedule from NHL API.");
     } finally {
       setScheduleLoading(false);
@@ -72,7 +74,7 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
-    fetchSchedule(selectedDate);
+    fetchSchedule(selectedDate, selectedGame !== null);
   }, [selectedDate, fetchSchedule]);
 
   const stopPolling = useCallback(() => {
@@ -86,25 +88,33 @@ export default function Dashboard() {
   const fetchGameData = useCallback(async (game: NHLGame): Promise<boolean> => {
     const gid = String(game.id);
     try {
-      const [xgRes, boxRes, matchupsRes] = await Promise.all([
+      const results = await Promise.allSettled([
         fetch(`${API_BASE}/game/${gid}`),
         fetch(`${API_BASE}/boxscore/${gid}`),
         fetch(`${API_BASE}/matchups/${gid}`)
       ]);
 
-      if (!xgRes.ok) throw new Error(`xG API error ${xgRes.status}`);
-      const xgData = await xgRes.json() as { shots: Shot[], winProbability?: { homeProb: number, awayProb: number } };
-      const newShots = xgData.shots ?? [];
-      if (xgData.winProbability) {
-        setWinProbability(xgData.winProbability);
+      const xgRes = results[0].status === "fulfilled" ? results[0].value : null;
+      const boxRes = results[1].status === "fulfilled" ? results[1].value : null;
+      const matchupsRes = results[2].status === "fulfilled" ? results[2].value : null;
+
+      let newShots: Shot[] = [];
+      if (xgRes && xgRes.ok) {
+        const xgData = await xgRes.json() as { shots: Shot[], winProbability?: { homeProb: number, awayProb: number } };
+        newShots = xgData.shots ?? [];
+        if (xgData.winProbability) {
+          setWinProbability(xgData.winProbability);
+        } else {
+          setWinProbability(null);
+        }
       } else {
         setWinProbability(null);
       }
       
       let actualHomeId: number | null = null; 
-      let currentGameState = game.gameState;
+      let currentGameState = game.gameState || "FUT";
 
-      if (boxRes.ok) {
+      if (boxRes && boxRes.ok) {
         const boxData = await boxRes.json() as {
           homeTeam?: { id: number, abbrev: string, name?: { default: string } };
           awayTeam?: { id: number, abbrev: string, name?: { default: string } };
@@ -125,7 +135,7 @@ export default function Dashboard() {
         }
       }
 
-      if (matchupsRes.ok) {
+      if (matchupsRes && matchupsRes.ok) {
         const matchData = await matchupsRes.json() as MatchupsResponse;
         if (matchData.team1 && matchData.team2) {
           setMatchups(matchData);
@@ -160,7 +170,7 @@ export default function Dashboard() {
           setStatusMsg(`Scheduled for ${scheduledTimeStr} · Pre-game · Polling paused`);
         }
       } else {
-        setStatusMsg(newShots.length ? `${newShots.length} shots loaded · Polling paused` : "Game not live · Polling paused");
+        setStatusMsg(newShots.length ? `${newShots.length} shots loaded · Polling paused` : "Game scheduled · Pre-game");
       }
 
       return gameIsLive;
@@ -315,9 +325,13 @@ export default function Dashboard() {
       {/* Tailored Followed Teams Feed */}
       <FollowedTeamsWidget
         onSelectGame={(game, date) => {
-          setSelectedDate(date);
-          setSelectedGame(game);
-          fetchGameData(game);
+          if (date && date !== selectedDate) {
+            setSelectedDate(date);
+          }
+          handleSelectGame(game);
+          setTimeout(() => {
+            window.scrollTo({ top: 250, behavior: "smooth" });
+          }, 50);
         }}
       />
 

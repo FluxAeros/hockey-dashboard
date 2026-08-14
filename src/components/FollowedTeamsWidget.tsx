@@ -28,7 +28,6 @@ export function FollowedTeamsWidget({ onSelectGame }: { onSelectGame?: (game: an
     }
     setLoading(true);
     try {
-      // If user is authenticated, we can fetch the server-tailored feed
       const token = localStorage.getItem("chelstatz_jwt_token");
       if (token) {
         const res = await fetch(`${API_BASE}/user/tailored-feed`, {
@@ -41,7 +40,6 @@ export function FollowedTeamsWidget({ onSelectGame }: { onSelectGame?: (game: an
         }
       }
 
-      // Fallback or guest user with local favorites: fetch standings and schedule
       const [standingsRes, scheduleRes] = await Promise.all([
         fetch(`${API_BASE}/standings/now`),
         fetch(`${API_BASE}/schedule-week/now`)
@@ -194,18 +192,18 @@ export function FollowedTeamsWidget({ onSelectGame }: { onSelectGame?: (game: an
                         <img
                           src={`https://assets.nhle.com/logos/nhl/svg/${game.awayTeam?.abbrev}_light.svg`}
                           alt={game.awayTeam?.abbrev}
-                          className="w-4 h-4 object-contain"
+                          className="followed-game-team-logo"
                         />
-                        <span className="text-xs font-semibold">{game.awayTeam?.abbrev}</span>
+                        <span className="followed-game-team-abbr">{game.awayTeam?.abbrev}</span>
                       </div>
-                      <span className="text-xs text-secondary">@</span>
+                      <span className="followed-game-at">@</span>
                       <div className="followed-team-row">
                         <img
                           src={`https://assets.nhle.com/logos/nhl/svg/${game.homeTeam?.abbrev}_light.svg`}
                           alt={game.homeTeam?.abbrev}
-                          className="w-4 h-4 object-contain"
+                          className="followed-game-team-logo"
                         />
-                        <span className="text-xs font-semibold">{game.homeTeam?.abbrev}</span>
+                        <span className="followed-game-team-abbr">{game.homeTeam?.abbrev}</span>
                       </div>
                     </div>
                     <div className="followed-game-meta">
@@ -250,7 +248,7 @@ export function FollowedTeamsWidget({ onSelectGame }: { onSelectGame?: (game: an
                         <span className={`text-xs ${awayFav ? "font-bold text-accent" : "text-secondary"}`}>
                           {game.awayTeam?.abbrev} {awayScore}
                         </span>
-                        <span className="text-xs text-secondary">-</span>
+                        <span className="followed-game-hyphen">-</span>
                         <span className={`text-xs ${homeFav ? "font-bold text-accent" : "text-secondary"}`}>
                           {game.homeTeam?.abbrev} {homeScore}
                         </span>
@@ -278,11 +276,11 @@ export function FollowedTeamsWidget({ onSelectGame }: { onSelectGame?: (game: an
               ) : (
                 feedData.standings.map((team) => (
                   <div key={team.teamAbbrev?.default} className="followed-standing-row">
-                    <div className="flex items-center gap-2">
-                      <img src={team.teamLogo} alt="" className="w-4 h-4 object-contain" />
+                    <div className="followed-standing-team-info">
+                      <img src={team.teamLogo} alt="" className="followed-standing-logo" />
                       <span className="text-xs font-semibold">{team.teamCommonName?.default || team.teamAbbrev?.default}</span>
                     </div>
-                    <div className="flex items-center gap-3 text-xs">
+                    <div className="followed-standing-stats">
                       <span className="text-secondary font-mono">{team.wins}-{team.losses}-{team.otLosses}</span>
                       <span className="font-bold font-mono text-primary">{team.points} PTS</span>
                       <span className="text-xs text-secondary">({team.divisionAbbrev})</span>

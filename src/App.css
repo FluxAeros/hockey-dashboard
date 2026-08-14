@@ -2807,19 +2807,57 @@
 .followed-game-teams {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.25rem;
+  min-width: 0;
 }
 
 .followed-team-row {
   display: flex;
   align-items: center;
-  gap: 0.3rem;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
+.followed-game-team-logo {
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  max-width: 18px;
+  object-fit: contain;
+  flex-shrink: 0;
+  display: block;
+}
+
+.followed-game-team-abbr {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+.followed-game-at {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  padding: 0 0.3rem;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.followed-game-hyphen {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  padding: 0 0.3rem;
+  flex-shrink: 0;
+  user-select: none;
 }
 
 .followed-game-meta {
   display: flex;
   align-items: center;
   gap: 0.4rem;
+  flex-shrink: 0;
 }
 
 .badge-final {
@@ -2841,9 +2879,34 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.35rem 0.5rem;
-  border-radius: 0.25rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: 0.375rem;
   background-color: rgba(15, 23, 42, 0.3);
+  gap: 0.5rem;
+}
+
+.followed-standing-team-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.followed-standing-logo {
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+  max-width: 20px;
+  object-fit: contain;
+  flex-shrink: 0;
+  display: block;
+}
+
+.followed-standing-stats {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-shrink: 0;
 }
 
 /* =========================================
