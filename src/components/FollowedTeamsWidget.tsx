@@ -107,7 +107,7 @@ export function FollowedTeamsWidget({ onSelectGame }: { onSelectGame?: (game: an
           </div>
         </div>
         <div className="followed-hub-empty-actions">
-          <button className="btn-secondary text-sm" onClick={() => navigate("/teams")}>
+          <button className="btn-secondary text-sm" onClick={() => navigate("/teams", { state: { fromAddFollowed: true } })}>
             Browse Teams
           </button>
           {!user && (
@@ -155,7 +155,7 @@ export function FollowedTeamsWidget({ onSelectGame }: { onSelectGame?: (game: an
               </span>
             );
           })}
-          <button className="add-team-chip" onClick={() => navigate("/teams")}>
+          <button className="add-team-chip" onClick={() => navigate("/teams", { state: { fromAddFollowed: true } })}>
             + Add Team
           </button>
         </div>

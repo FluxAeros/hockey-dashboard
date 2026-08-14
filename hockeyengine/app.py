@@ -460,7 +460,12 @@ async def get_schedule(date: str):
         url = f"https://api-web.nhle.com/v1/schedule/{date}"
         res = await client.get(url)
         if res.status_code != 200:
-            raise HTTPException(status_code=res.status_code, detail=f"NHL API returned {res.status_code}")
+            return fix_double_encoding({
+                "games": [],
+                "gameWeek": [],
+                "nextStartDate": None,
+                "previousStartDate": None
+            })
         data = res.json()
         game_week = data.get('gameWeek', [])
         day = next((d for d in game_week if d.get('date') == date), None)

@@ -78,9 +78,9 @@ export default function Dashboard() {
       setScheduleGames(games);
       setScheduleWeek(data.gameWeek ?? []);
       setNextStartDate(data.nextStartDate ?? null);
-      if (!games.length) setScheduleError("No games scheduled for this date.");
+      if (!games.length && !keepSelected) setScheduleError("No games scheduled for this date.");
     } catch {
-      setScheduleError("Could not load schedule from NHL API.");
+      if (!keepSelected) setScheduleError("Could not load schedule from NHL API.");
     } finally {
       setScheduleLoading(false);
     }
@@ -213,6 +213,7 @@ export default function Dashboard() {
 
   const handleSelectGame = useCallback(async (game: NHLGame) => {
     stopPolling();
+    setScheduleError(null);
     setSelectedGame(game);
     setGamesCollapsed(true);
     setShots([]);
@@ -348,7 +349,7 @@ export default function Dashboard() {
         }}
       />
 
-      {scheduleError && (
+      {scheduleError && !selectedGame && (
         <div className="alert-error schedule-error">
           <span>{scheduleError}</span>
           {(scheduleWeek.some(d => d.date > selectedDate && ((d.numberOfGames ?? 0) > 0 || d.games?.length > 0)) || nextStartDate) && (

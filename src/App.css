@@ -3126,3 +3126,33 @@
   fill: #f59e0b;
 }
 
+/* Follow Selection Flow */
+.select-team-follow-banner {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(30, 41, 59, 0.8) 100%);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  border-radius: 0.5rem;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1.25rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.select-team-banner-content {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.selectable-follow-card {
+  border-color: rgba(245, 158, 11, 0.3) !important;
+}
+
+.selectable-follow-card:hover {
+  border-color: #f59e0b !important;
+  box-shadow: 0 0 15px rgba(245, 158, 11, 0.25) !important;
+}
+
+

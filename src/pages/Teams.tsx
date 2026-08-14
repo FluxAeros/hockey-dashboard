@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { RosterCard, type RosterPlayer } from "../components/RosterCard";
 import { TEAM_COLORS } from "../utils/helpers";
 import { NHL_TEAMS, TEAM_CONFERENCE, STANLEY_CUPS } from "../utils/teamsData";
@@ -31,6 +32,10 @@ const teamCardVariants = {
 };
 
 export default function Teams() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const isSelectingForFollow = Boolean(location.state?.fromAddFollowed);
+
   const { isFavorite, toggleFavorite } = useAuth();
   const [selectedTeam, setSelectedTeam] = useState<string | null>(null);
   const [raisingTeam, setRaisingTeam] = useState<string | null>(null);
@@ -73,6 +78,17 @@ export default function Teams() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleCardClick = (abbr: string) => {
+    if (isSelectingForFollow) {
+      if (!isFavorite(abbr)) {
+        toggleFavorite(abbr);
+      }
+      navigate("/");
+      return;
+    }
+    handleSelectTeam(abbr);
   };
 
   const handleSelectPlayer = async (player: RosterPlayer) => {
@@ -126,6 +142,20 @@ export default function Teams() {
             variants={gridContainerVariants}
             onAnimationStart={() => { hasAnimatedGrid.current = true; }}
           >
+            {isSelectingForFollow && (
+              <div className="select-team-follow-banner">
+                <div className="select-team-banner-content">
+                  <Star size={18} className="fill-amber text-amber" />
+                  <span className="font-semibold text-sm text-primary">
+                    Click any team to add them to your Live Tracker followed list
+                  </span>
+                </div>
+                <button className="btn-secondary text-xs" onClick={() => navigate("/")}>
+                  Back to Tracker
+                </button>
+              </div>
+            )}
+
             <div className="teams-page-header">
               <h1 className="page-title">Teams &amp; Rosters</h1>
               <div className="conference-filter">
@@ -148,12 +178,15 @@ export default function Teams() {
                 const color = TEAM_COLORS[team.teamAbbrev] || 'var(--border-primary)';
                 const cups = STANLEY_CUPS[team.teamAbbrev] || [];
                 return (
-                  <motion.button 
+                  <motion.div 
                     layoutId={`team-card-${team.teamAbbrev}`}
                     key={team.teamAbbrev}
                     variants={teamCardVariants}
-                    className="team-card-btn"
-                    onClick={() => handleSelectTeam(team.teamAbbrev)}
+                    className={`team-card-btn ${isSelectingForFollow ? 'selectable-follow-card' : ''}`}
+                    onClick={() => handleCardClick(team.teamAbbrev)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleCardClick(team.teamAbbrev); }}
                     whileHover={{ scale: 1.03, y: -4, transition: { type: "spring", stiffness: 380, damping: 22 } }}
                     whileTap={{ scale: 0.97, transition: { type: "spring", stiffness: 500, damping: 28 } }}
                     style={{ 
@@ -161,6 +194,7 @@ export default function Teams() {
                       borderColor: 'var(--border-primary)',
                       position: 'relative',
                       zIndex: raisingTeam === team.teamAbbrev ? 10 : 1,
+                      cursor: 'pointer'
                     }}
                   >
                     {cups.length > 0 && (
@@ -174,6 +208,9 @@ export default function Teams() {
                       onClick={(e) => {
                         e.stopPropagation();
                         toggleFavorite(team.teamAbbrev);
+                        if (isSelectingForFollow) {
+                          navigate("/");
+                        }
                       }}
                       title={isFavorite(team.teamAbbrev) ? "Unfollow team" : "Follow team"}
                     >
@@ -188,7 +225,7 @@ export default function Teams() {
                         </span>
                       </motion.div>
                     </motion.div>
-                  </motion.button>
+                  </motion.div>
                 );
               })}
             </div>
