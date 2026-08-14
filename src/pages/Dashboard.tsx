@@ -6,6 +6,7 @@ import { GameCard } from "../components/GameCard";
 import { HockeyRink } from "../components/HockeyRink";
 import { MatchupBoard } from "../components/MatchupBoard";
 import { Scoreboard } from "../components/Scoreboard";
+import { FollowedTeamsWidget } from "../components/FollowedTeamsWidget";
 import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from "lucide-react";
 import { DatePicker } from "../components/DatePicker";
 
@@ -310,6 +311,15 @@ export default function Dashboard() {
           </button>
         </div>
       </div>
+
+      {/* Tailored Followed Teams Feed */}
+      <FollowedTeamsWidget
+        onSelectGame={(game, date) => {
+          setSelectedDate(date);
+          setSelectedGame(game);
+          fetchGameData(game);
+        }}
+      />
 
       {scheduleError && (
         <div className="alert-error schedule-error">

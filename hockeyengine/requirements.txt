@@ -5,3 +5,7 @@ numpy
 requests
 joblib
 scikit-learn
+httpx
+sqlalchemy
+pyjwt
+bcrypt

@@ -2,8 +2,9 @@ import { useState, useRef } from "react";
 import { RosterCard, type RosterPlayer } from "../components/RosterCard";
 import { TEAM_COLORS } from "../utils/helpers";
 import { NHL_TEAMS, TEAM_CONFERENCE, STANLEY_CUPS } from "../utils/teamsData";
-import { ArrowLeft, X, Trophy } from "lucide-react";
+import { ArrowLeft, X, Trophy, Star } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useAuth } from "../context/AuthContext";
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 
@@ -30,6 +31,7 @@ const teamCardVariants = {
 };
 
 export default function Teams() {
+  const { isFavorite, toggleFavorite } = useAuth();
   const [selectedTeam, setSelectedTeam] = useState<string | null>(null);
   const [raisingTeam, setRaisingTeam] = useState<string | null>(null);
   const [conferenceFilter, setConferenceFilter] = useState<"All" | "Eastern" | "Western">("All");
@@ -167,6 +169,16 @@ export default function Teams() {
                         <span>{cups.length}</span>
                       </div>
                     )}
+                    <button
+                      className={`team-card-fav-btn ${isFavorite(team.teamAbbrev) ? 'active' : ''}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleFavorite(team.teamAbbrev);
+                      }}
+                      title={isFavorite(team.teamAbbrev) ? "Unfollow team" : "Follow team"}
+                    >
+                      <Star size={15} className={isFavorite(team.teamAbbrev) ? "fill-amber text-amber" : ""} />
+                    </button>
                     <motion.div layoutId={`team-content-${team.teamAbbrev}`} className="team-card-content">
                       <motion.img layoutId={`team-logo-${team.teamAbbrev}`} src={team.teamLogo} alt={team.teamName} className="team-logo-img" />
                       <motion.div layoutId={`team-text-${team.teamAbbrev}`} className="team-card-text">
@@ -233,6 +245,15 @@ export default function Teams() {
                         {STANLEY_CUPS[selectedTeam].join(', ')}
                       </span>
                     </div>
+                  )}
+                  {selectedTeam && (
+                    <button
+                      className={`team-hero-fav-btn ${isFavorite(selectedTeam) ? 'active' : ''}`}
+                      onClick={() => toggleFavorite(selectedTeam)}
+                    >
+                      <Star size={16} className={isFavorite(selectedTeam) ? "fill-amber text-amber" : ""} />
+                      <span>{isFavorite(selectedTeam) ? "Following Team" : "Follow Team"}</span>
+                    </button>
                   )}
                 </motion.div>
               </motion.div>

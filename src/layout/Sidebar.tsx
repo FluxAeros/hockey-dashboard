@@ -1,6 +1,7 @@
 import { NavLink } from "react-router-dom";
-import { Activity, Calendar, Trophy, Users, Settings } from "lucide-react";
+import { Activity, Calendar, Trophy, Users, User as UserIcon, LogIn, LogOut, Star } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useAuth } from "../context/AuthContext";
 
 function useMobile() {
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
@@ -22,6 +23,8 @@ const NAV_LINKS = [
 
 export function Sidebar() {
   const isMobile = useMobile();
+  const { user, favorites, openAuthModal, logout } = useAuth();
+  const [showUserMenu, setShowUserMenu] = useState(false);
 
   if (isMobile) {
     return (
@@ -37,6 +40,32 @@ export function Sidebar() {
             <span className="bottom-nav-label">{label}</span>
           </NavLink>
         ))}
+        <button
+          className="bottom-nav-link account-nav-btn"
+          onClick={() => (user ? setShowUserMenu(!showUserMenu) : openAuthModal("login"))}
+        >
+          <UserIcon size={22} />
+          <span className="bottom-nav-label">{user ? user.username : "Account"}</span>
+        </button>
+
+        {showUserMenu && user && (
+          <div className="mobile-user-popover">
+            <div className="user-popover-header">
+              <span className="font-bold">{user.username}</span>
+              <span className="text-xs text-secondary">{favorites.length} team(s) followed</span>
+            </div>
+            <button
+              className="user-popover-logout"
+              onClick={() => {
+                logout();
+                setShowUserMenu(false);
+              }}
+            >
+              <LogOut size={14} />
+              <span>Log Out</span>
+            </button>
+          </div>
+        )}
       </nav>
     );
   }
@@ -66,10 +95,33 @@ export function Sidebar() {
       </nav>
 
       <div className="sidebar-footer">
-        <button className="nav-link">
-          <Settings className="nav-icon" />
-          <span className="nav-text">Settings</span>
-        </button>
+        {user ? (
+          <div className="user-profile-badge">
+            <div className="user-avatar-circle">
+              {user.username.charAt(0).toUpperCase()}
+            </div>
+            <div className="user-info-text">
+              <span className="user-name-label">{user.username}</span>
+              <span className="user-favs-count">
+                <Star size={11} className="fill-amber text-amber" />
+                {favorites.length} followed
+              </span>
+            </div>
+            <button
+              className="user-logout-btn"
+              onClick={logout}
+              title="Log Out"
+              aria-label="Log Out"
+            >
+              <LogOut size={15} />
+            </button>
+          </div>
+        ) : (
+          <button className="nav-link auth-login-trigger" onClick={() => openAuthModal("login")}>
+            <LogIn className="nav-icon" />
+            <span className="nav-text">Sign In / Register</span>
+          </button>
+        )}
       </div>
     </aside>
   );
