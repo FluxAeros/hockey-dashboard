@@ -24,6 +24,59 @@ export function formatLocalDateString(dateStr: string, options?: Intl.DateTimeFo
   return dt.toLocaleDateString(undefined, options || { weekday: "long", month: "short", day: "numeric" });
 }
 
+/**
+ * Format game start time from UTC ISO string into localized time/date string.
+ * Example: "7:00 PM" (if today) or "Oct 12 at 7:00 PM" (if another date).
+ */
+export function formatGameScheduleDateTime(startTimeUTC?: string): string {
+  if (!startTimeUTC) return "";
+  const date = new Date(startTimeUTC);
+  if (isNaN(date.getTime())) return "";
+  const isToday = date.toDateString() === new Date().toDateString();
+  const timeStr = date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  if (isToday) {
+    return timeStr;
+  }
+  const dateStr = date.toLocaleDateString([], { month: "short", day: "numeric" });
+  return `${dateStr} at ${timeStr}`;
+}
+
+/**
+ * Checks if a game is currently live and actively being played based on its game state and schedule time.
+ */
+export function isGameActiveLive(
+  game?: { gameState?: string; startTimeUTC?: string } | null,
+  currentGameState?: string
+): boolean {
+  if (!game) return false;
+  const state = (currentGameState || game.gameState || "").toUpperCase();
+
+  // Concluded/final game states are never live
+  if (["OVER", "OFF", "FINAL"].includes(state)) {
+    return false;
+  }
+
+  // Explicit in-progress live game states
+  if (state === "LIVE" || state === "CRIT") {
+    return true;
+  }
+
+  // If scheduled in the future, check against start time
+  if (game.startTimeUTC) {
+    const startTime = new Date(game.startTimeUTC).getTime();
+    if (!isNaN(startTime) && Date.now() < startTime) {
+      return false;
+    }
+  }
+
+  // If state is explicitly FUT, it is not live
+  if (state === "FUT") {
+    return false;
+  }
+
+  return false;
+}
+
 
 export function xgToRadius(xg: number): number {
   return 1.5 + xg * 6;

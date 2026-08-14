@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import type { NHLGame, Shot, MatchupsResponse, GameStats } from "../types";
-import { todayDateString, shiftDate } from "../utils/helpers";
+import { todayDateString, shiftDate, formatGameScheduleDateTime, isGameActiveLive } from "../utils/helpers";
 import { GameCard } from "../components/GameCard";
 import { HockeyRink } from "../components/HockeyRink";
 import { MatchupBoard } from "../components/MatchupBoard";
@@ -82,7 +82,7 @@ export default function Dashboard() {
 
   const [winProbability, setWinProbability] = useState<{ homeProb: number, awayProb: number } | null>(null);
 
-  const fetchGameData = useCallback(async (game: NHLGame) => {
+  const fetchGameData = useCallback(async (game: NHLGame): Promise<boolean> => {
     const gid = String(game.id);
     try {
       const [xgRes, boxRes, matchupsRes] = await Promise.all([
@@ -101,6 +101,7 @@ export default function Dashboard() {
       }
       
       let actualHomeId: number | null = null; 
+      let currentGameState = game.gameState;
 
       if (boxRes.ok) {
         const boxData = await boxRes.json() as {
@@ -118,7 +119,9 @@ export default function Dashboard() {
           setAwayTeamName(boxData.awayTeam.name?.default ?? boxData.awayTeam.abbrev ?? "Away");
           setAwayTeamAbbr(boxData.awayTeam.abbrev ?? "AWAY");
         }
-        setIsLive(boxData.gameState === "LIVE" || boxData.gameState === "CRIT");
+        if (boxData.gameState) {
+          currentGameState = boxData.gameState;
+        }
       }
 
       if (matchupsRes.ok) {
@@ -136,10 +139,34 @@ export default function Dashboard() {
       setShots(newShots);
       setLastUpdated(new Date());
       setGameStatus("live");
-      setStatusMsg(newShots.length ? `${newShots.length} shots loaded` : "No shots yet — game may not have started.");
+
+      const gameIsLive = isGameActiveLive({ ...game, gameState: currentGameState }, currentGameState);
+      setIsLive(gameIsLive);
+
+      // Determine clear informative status message referencing schedule & game state
+      const isFinal = ["OVER", "OFF", "FINAL"].includes(currentGameState);
+      const scheduledTimeStr = formatGameScheduleDateTime(game.startTimeUTC);
+
+      if (gameIsLive) {
+        setStatusMsg(newShots.length ? `${newShots.length} shots recorded (Live)` : "Game is live · Waiting for first shot");
+      } else if (isFinal) {
+        setStatusMsg(`Final · ${newShots.length} shots recorded · Polling paused`);
+      } else if (scheduledTimeStr) {
+        const startTime = game.startTimeUTC ? new Date(game.startTimeUTC).getTime() : 0;
+        if (startTime && Date.now() < startTime) {
+          setStatusMsg(`Scheduled for ${scheduledTimeStr} · Polling paused until game starts`);
+        } else {
+          setStatusMsg(`Scheduled for ${scheduledTimeStr} · Pre-game · Polling paused`);
+        }
+      } else {
+        setStatusMsg(newShots.length ? `${newShots.length} shots loaded · Polling paused` : "Game not live · Polling paused");
+      }
+
+      return gameIsLive;
     } catch (err) {
       setGameStatus("error");
       setStatusMsg("Cannot reach FastAPI server at localhost:8000. Is it running?");
+      return false;
     }
   }, []);
 
@@ -147,9 +174,13 @@ export default function Dashboard() {
     stopPolling();
     setCountdown(REFRESH_INTERVAL / 1000);
     setPollingActive(true);
-    intervalRef.current = setInterval(() => {
-      fetchGameData(game);
-      setCountdown(REFRESH_INTERVAL / 1000);
+    intervalRef.current = setInterval(async () => {
+      const stillLive = await fetchGameData(game);
+      if (!stillLive) {
+        stopPolling();
+      } else {
+        setCountdown(REFRESH_INTERVAL / 1000);
+      }
     }, REFRESH_INTERVAL);
     countdownRef.current = setInterval(() => {
       setCountdown(prev => Math.max(0, prev - 1));
@@ -168,8 +199,10 @@ export default function Dashboard() {
     setAwayTeamAbbr(game.awayTeam?.abbrev ?? "AWAY");
     setGameStatus("loading");
     setStatusMsg("Loading…");
-    await fetchGameData(game);
-    startPolling(game);
+    const gameIsLive = await fetchGameData(game);
+    if (gameIsLive) {
+      startPolling(game);
+    }
   }, [fetchGameData, startPolling, stopPolling]);
 
   // Handle incoming game from Schedule page routing
@@ -335,19 +368,25 @@ export default function Dashboard() {
             <span className={gameStatus === "error" ? "text-error" : ""}>{statusMsg}</span>
           </div>
           <div className="status-controls">
-            {pollingActive && (
+            {pollingActive ? (
               <>
                 <span className="status-text">Refresh in {countdown}s</span>
                 <button className="btn-secondary" onClick={stopPolling}>Pause</button>
               </>
-            )}
-            {!pollingActive && selectedGame && (
-              <button
-                className="btn-secondary"
-                onClick={() => { fetchGameData(selectedGame); startPolling(selectedGame); }}
-              >
-                Resume
-              </button>
+            ) : (
+              selectedGame && (
+                <button
+                  className="btn-secondary"
+                  onClick={async () => {
+                    const gameIsLive = await fetchGameData(selectedGame);
+                    if (gameIsLive) {
+                      startPolling(selectedGame);
+                    }
+                  }}
+                >
+                  {isLive ? "Resume" : "Refresh"}
+                </button>
+              )
             )}
             {lastUpdated && (
               <span className="status-text">Updated {lastUpdated.toLocaleTimeString()}</span>

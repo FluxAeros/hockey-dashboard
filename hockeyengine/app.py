@@ -34,6 +34,14 @@ app.add_middleware(
 
 SHOT_TYPE_CATEGORIES = ['backhand', 'deflected', 'slap', 'snap', 'tip-in', 'wrap-around', 'wrist', 'unknown']
 
+@app.get("/")
+def root():
+    return {"status": "ok", "message": "NHL Live Expected Goals Service is running"}
+
+@app.get("/health")
+def health():
+    return {"status": "healthy"}
+
 # Load the advanced gradient boosting model
 # Note: Ensure you have your trained 'xg_model_gb.pkl' file in the directory
 
