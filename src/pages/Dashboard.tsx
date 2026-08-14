@@ -398,6 +398,19 @@ export default function Dashboard() {
         </div>
       )}
 
+
+
+      {selectedGame && (
+        <Scoreboard 
+          stats={s} 
+          homeTeamAbbr={homeTeamAbbr} 
+          awayTeamAbbr={awayTeamAbbr} 
+          homeTeamName={homeTeamName} 
+          awayTeamName={awayTeamName} 
+          winProbability={winProbability}
+        />
+      )}
+
       {selectedGame && (
         <div className="status-bar">
           <div className="status-message">
@@ -432,17 +445,6 @@ export default function Dashboard() {
             )}
           </div>
         </div>
-      )}
-
-      {selectedGame && (
-        <Scoreboard 
-          stats={s} 
-          homeTeamAbbr={homeTeamAbbr} 
-          awayTeamAbbr={awayTeamAbbr} 
-          homeTeamName={homeTeamName} 
-          awayTeamName={awayTeamName} 
-          winProbability={winProbability}
-        />
       )}
 
       {selectedGame && (

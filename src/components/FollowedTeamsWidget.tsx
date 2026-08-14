@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
-import { Star, Flame, Trophy, Calendar, Sparkles, ChevronDown, ChevronUp } from "lucide-react";
+import { Star, Flame, Trophy, Calendar, Sparkles, ChevronDown, ChevronUp, MoveHorizontal, LogOut, LogIn } from "lucide-react";
 import { NHL_TEAMS_METADATA } from "../utils/nhlDivisions";
 import { formatLocalDateString } from "../utils/helpers";
 import { API_BASE } from "../utils/api";
@@ -20,7 +20,7 @@ interface FollowedTeamsWidgetProps {
 }
 
 export function FollowedTeamsWidget({ onSelectGame, isGameSelected = false }: FollowedTeamsWidgetProps) {
-  const { user, favorites, toggleFavorite, openAuthModal } = useAuth();
+  const { user, favorites, toggleFavorite, openAuthModal, logout } = useAuth();
   const navigate = useNavigate();
   const [feedData, setFeedData] = useState<TailoredFeedData | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
@@ -174,14 +174,24 @@ export function FollowedTeamsWidget({ onSelectGame, isGameSelected = false }: Fo
             </button>
           </div>
 
-          <button
-            className="followed-hub-toggle-btn"
-            onClick={() => setIsManuallyExpanded(isCollapsed)}
-            title={isCollapsed ? "Expand Hub" : "Collapse Hub"}
-            aria-label={isCollapsed ? "Expand Hub" : "Collapse Hub"}
-          >
-            {isCollapsed ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+            <button
+              className="followed-hub-toggle-btn auth-btn-mobile"
+              onClick={(e) => { e.stopPropagation(); user ? logout() : openAuthModal("login"); }}
+              title={user ? "Log Out" : "Log In"}
+              aria-label={user ? "Log Out" : "Log In"}
+            >
+              {user ? <LogOut size={16} /> : <LogIn size={16} />}
+            </button>
+            <button
+              className="followed-hub-toggle-btn"
+              onClick={() => setIsManuallyExpanded(isCollapsed)}
+              title={isCollapsed ? "Expand Hub" : "Collapse Hub"}
+              aria-label={isCollapsed ? "Expand Hub" : "Collapse Hub"}
+            >
+              {isCollapsed ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -321,6 +331,13 @@ export function FollowedTeamsWidget({ onSelectGame, isGameSelected = false }: Fo
               )}
             </div>
           </div>
+        </div>
+      )}
+
+      {!isCollapsed && feedData && (
+        <div className="mobile-swipe-indicator">
+          <MoveHorizontal size={14} />
+          <span>Swipe for more</span>
         </div>
       )}
     </div>

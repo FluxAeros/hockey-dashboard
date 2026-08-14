@@ -136,9 +136,9 @@ export default function Teams() {
         {!selectedTeam && (
           <motion.div 
             key="grid-view"
-            initial={hasAnimatedGrid.current ? { opacity: 0 } : "hidden"}
-            animate={hasAnimatedGrid.current ? { opacity: 1 } : "visible"}
-            exit={{ opacity: 0, transition: { duration: 0.12 } }}
+            initial={hasAnimatedGrid.current ? false : "hidden"}
+            animate="visible"
+            exit="exit"
             variants={gridContainerVariants}
             onAnimationStart={() => { hasAnimatedGrid.current = true; }}
           >

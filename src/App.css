@@ -847,15 +847,15 @@
 
 .schedule-header {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 1rem;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.5rem;
 }
 
 .schedule-title-group {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 1.5rem;
   flex-wrap: wrap;
 }
@@ -3197,6 +3197,10 @@
   user-select: none;
 }
 
+.mobile-swipe-indicator {
+  display: none;
+}
+
 /* =========================================
    Mobile Followed Hub Swipeable Cards
    ========================================= */
@@ -3217,6 +3221,24 @@
     flex-shrink: 0;
     scroll-snap-align: start;
   }
+
+  .mobile-swipe-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    padding-top: 0.25rem;
+    padding-bottom: 0.5rem;
+    animation: pulse 2s infinite;
+  }
+}
+
+@keyframes pulse {
+  0% { opacity: 0.5; }
+  50% { opacity: 1; }
+  100% { opacity: 0.5; }
 }
 
 
