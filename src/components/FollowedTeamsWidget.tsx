@@ -274,19 +274,26 @@ export function FollowedTeamsWidget({ onSelectGame }: { onSelectGame?: (game: an
               {feedData.standings.length === 0 ? (
                 <div className="text-xs text-secondary p-3">Loading standings...</div>
               ) : (
-                feedData.standings.map((team) => (
-                  <div key={team.teamAbbrev?.default} className="followed-standing-row">
-                    <div className="followed-standing-team-info">
-                      <img src={team.teamLogo} alt="" className="followed-standing-logo" />
-                      <span className="text-xs font-semibold">{team.teamCommonName?.default || team.teamAbbrev?.default}</span>
+                feedData.standings.map((team) => {
+                  const abbr = team.teamAbbrev?.default || "";
+                  const commonName = team.teamCommonName?.default || abbr;
+                  return (
+                    <div key={abbr} className="followed-standing-row">
+                      <div className="followed-standing-team-info">
+                        <img src={team.teamLogo} alt={abbr} className="followed-standing-logo" />
+                        <div className="followed-standing-names">
+                          <span className="followed-standing-abbr">{abbr}</span>
+                          <span className="followed-standing-fullname">{commonName}</span>
+                        </div>
+                      </div>
+                      <div className="followed-standing-stats">
+                        <span className="standing-record">{team.wins}-{team.losses}-{team.otLosses}</span>
+                        <span className="standing-pts">{team.points} <span className="standing-pts-label">PTS</span></span>
+                        <span className="standing-div">({team.divisionAbbrev})</span>
+                      </div>
                     </div>
-                    <div className="followed-standing-stats">
-                      <span className="text-secondary font-mono">{team.wins}-{team.losses}-{team.otLosses}</span>
-                      <span className="font-bold font-mono text-primary">{team.points} PTS</span>
-                      <span className="text-xs text-secondary">({team.divisionAbbrev})</span>
-                    </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>
