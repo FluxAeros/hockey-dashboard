@@ -50,6 +50,7 @@ export default function Teams() {
   const [playerLoading, setPlayerLoading] = useState<boolean>(false);
 
   const handleSelectTeam = async (abbr: string) => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
     setSelectedTeam(abbr);
     setLoading(true);
     setError(null);
@@ -199,9 +200,10 @@ export default function Teams() {
             </motion.button>
             
             <motion.div 
-              layoutId={`team-card-${selectedTeam}`}
               className="team-hero-card"
-              transition={{ type: "spring", stiffness: 200, damping: 28 }}
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ type: "spring", stiffness: 220, damping: 30 }}
               style={{ 
                 background: `linear-gradient(135deg, ${activeColor}20 0%, var(--bg-secondary) 100%)`,
                 borderColor: activeColor 
@@ -275,10 +277,12 @@ export default function Teams() {
             transition={{ duration: 0.2 }}
           >
             <motion.div 
-              layoutId={`player-card-${selectedPlayer.id}`}
               className="player-modal"
               onClick={e => e.stopPropagation()}
-              transition={{ type: "spring", stiffness: 300, damping: 28 }}
+              initial={{ opacity: 0, y: 40, scale: 0.97 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 20, scale: 0.98 }}
+              transition={{ type: "spring", stiffness: 360, damping: 32 }}
             >
               <button className="modal-close" onClick={closePlayerModal}><X size={24} /></button>
               

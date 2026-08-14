@@ -976,52 +976,60 @@
 
 .roster-tabs {
   display: flex;
-  gap: 0.5rem;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-primary);
-  border-radius: 0.75rem;
-  padding: 0.35rem;
+  gap: 0;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0.875rem;
+  padding: 0.3rem;
   width: fit-content;
   margin-bottom: 0.5rem;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3);
+  max-width: 100%;
 }
 
 .roster-tab-btn {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.5rem 1rem;
-  border-radius: 0.5rem;
+  padding: 0.5rem 1.1rem;
+  border-radius: 0.6rem;
   font-size: 0.875rem;
   font-weight: 600;
-  color: var(--text-secondary);
+  color: rgba(255, 255, 255, 0.45);
   background: transparent;
   border: none;
   transition: all 0.2s ease;
   white-space: nowrap;
+  flex-shrink: 0;
+  letter-spacing: 0.01em;
 }
 
 .roster-tab-btn:hover {
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
+  color: rgba(255, 255, 255, 0.75);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .roster-tab-btn.active {
-  background: rgba(56, 189, 248, 0.15);
-  color: var(--accent-primary);
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .roster-tab-count {
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   font-weight: 700;
-  padding: 0.15rem 0.4rem;
+  padding: 0.12rem 0.4rem;
   border-radius: 1rem;
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.5);
+  min-width: 1.4rem;
+  text-align: center;
 }
 
 .roster-tab-btn.active .roster-tab-count {
   background: var(--accent-primary);
   color: var(--bg-primary);
+  opacity: 1;
 }
 
 .roster-grid {
@@ -1101,6 +1109,11 @@
   font-size: 1.25rem;
   font-weight: 800;
   color: var(--accent-primary);
+}
+
+/* Mobile horizontal roster card layout */
+.roster-card-mobile-row {
+  display: none;
 }
 
 .team-hero-view {
@@ -1510,6 +1523,18 @@
     width: 100%;
     justify-content: space-between;
     gap: 0.75rem;
+    flex-wrap: nowrap;
+    align-items: center;
+  }
+
+  /* Shrink the title+range block so nav controls never wrap */
+  .schedule-title-group > div:first-child {
+    min-width: 0;
+    flex-shrink: 1;
+  }
+
+  .schedule-week-range {
+    font-size: 0.7rem;
   }
 
   .day-header {
@@ -1544,6 +1569,7 @@
     align-items: flex-start;
   }
 
+  /* Teams filter: 3 short items → equal-width full-row */
   .conference-filter {
     width: 100%;
     justify-content: stretch;
@@ -1552,6 +1578,24 @@
   .conf-filter-btn {
     flex: 1;
     text-align: center;
+  }
+
+  /* Standings & Schedule filters: 4 items → 2×2 grid */
+  .standings-header .conference-filter,
+  .schedule-header .conference-filter {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.3rem;
+  }
+
+  .standings-header .conf-filter-btn,
+  .schedule-header .conf-filter-btn {
+    flex: unset;
+    white-space: normal;
+    line-height: 1.25;
+    text-align: center;
+    padding: 0.4rem 0.5rem;
+    font-size: 0.75rem;
   }
 
   /* ---- Team Hero view ---- */
@@ -1611,44 +1655,80 @@
     gap: 2rem;
   }
 
+  /* Roster tabs: full-width, smaller to avoid overflow */
+  .roster-tabs {
+    width: 100%;
+  }
+
+  .roster-tabs .roster-tab-btn {
+    flex: 1;
+    justify-content: center;
+    font-size: 0.75rem;
+    padding: 0.4rem 0.5rem;
+    gap: 0.35rem;
+  }
+
+  .roster-tabs .roster-tab-count {
+    font-size: 0.65rem;
+    padding: 0.1rem 0.3rem;
+    min-width: 1.2rem;
+  }
+
   /* ---- Player Modal — full bottom sheet, height-capped ---- */
   .player-modal-backdrop {
     align-items: flex-end;
-    /* Ensure backdrop never scrolls behind the sheet */
     overflow: hidden;
+    /* Push sheet above the fixed bottom nav bar */
+    padding-bottom: calc(3.75rem + env(safe-area-inset-bottom));
   }
 
   .player-modal {
     width: 100%;
     max-width: 100%;
-    /* dvh accounts for browser chrome / notches; fallback to vh */
-    max-height: 82dvh;
-    max-height: 82vh;
+    /* vh fallback first, dvh overrides where supported */
+    max-height: 75vh;
+    max-height: 75dvh;
     height: auto;
     border-radius: 1.5rem 1.5rem 0 0;
-    /* Scroll happens inside the modal, not on the backdrop */
     overflow-y: auto;
+    overflow-x: hidden;
     overscroll-behavior: contain;
-    /* Push above the bottom nav bar */
-    margin-bottom: 0;
   }
 
   .player-modal-header {
-    padding: 1.5rem;
-    gap: 1rem;
+    padding: 1.25rem;
+    gap: 0.75rem;
+    flex-wrap: nowrap;
+    align-items: center;
   }
 
   .player-modal-avatar {
-    width: 80px;
-    height: 80px;
+    width: 64px;
+    height: 64px;
+    flex-shrink: 0;
+  }
+
+  .player-modal-title {
+    min-width: 0;
+    flex: 1;
   }
 
   .player-modal-title h2 {
-    font-size: 1.75rem;
+    font-size: 1.4rem;
+    word-break: break-word;
+    overflow-wrap: break-word;
   }
 
   .player-modal-body {
-    padding: 1.25rem;
+    padding: 1rem;
+  }
+
+  .player-stats-grid {
+    gap: 1rem;
+  }
+
+  .season-stats-container {
+    padding: 1rem;
   }
 
   /* ---- Hockey rink ---- */
@@ -1661,10 +1741,6 @@
 @media (min-width: 480px) and (max-width: 767px) {
   .team-selector-grid {
     grid-template-columns: repeat(3, 1fr);
-  }
-
-  .roster-grid {
-    grid-template-columns: repeat(2, 1fr);
   }
 
   .game-cards-container {
@@ -1693,6 +1769,41 @@
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+}
+
+/* Wildcard layout */
+.standings-wildcard {
+  display: flex;
+  flex-direction: column;
+  gap: 3rem;
+}
+
+.wildcard-conference-block {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.wildcard-conference-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border-primary);
+}
+
+.wildcard-race-section {
+  position: relative;
+  padding-top: 0.25rem;
+}
+
+.wildcard-race-section::before {
+  content: 'Wild Card Race';
+  display: none; /* handled by the table title */
 }
 
 .standings-card {
@@ -2043,14 +2154,10 @@
     align-items: flex-start;
   }
 
-  .standings-header .conference-filter {
-    width: 100%;
-    justify-content: stretch;
-  }
+  /* Standings has 4 tabs — handled by the shared 2×2 grid rule above */
 
-  .standings-header .conf-filter-btn {
-    flex: 1;
-    text-align: center;
+  .wildcard-conference-title {
+    font-size: 1rem;
   }
 }
 

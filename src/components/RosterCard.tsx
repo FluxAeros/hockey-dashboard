@@ -28,7 +28,6 @@ const cardVariants = {
 export function RosterCard({ player, onClick, index = 0 }: { player: RosterPlayer, onClick: (player: RosterPlayer) => void, index?: number }) {
   return (
     <motion.button 
-      layoutId={`player-card-${player.id}`}
       custom={index}
       variants={cardVariants}
       initial="hidden"

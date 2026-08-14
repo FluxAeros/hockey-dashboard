@@ -285,9 +285,9 @@ export default function Standings() {
             remainingForWildcard.sort((a, b) => b.points - a.points || b.regulationWins - a.regulationWins);
 
             return (
-              <div key={conf} className="mb-8">
-                <h2 className="section-subtitle mb-4" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <Trophy size={20} className="text-accent" /> {conf} Conference Race
+              <div key={conf} className="wildcard-conference-block">
+                <h2 className="wildcard-conference-title">
+                  <Trophy size={18} className="text-accent" /> {conf} Conference Race
                 </h2>
                 <div className="standings-grid-2col">
                   {divisions.map(divName => {
@@ -299,7 +299,9 @@ export default function Standings() {
                     );
                   })}
                 </div>
-                {renderTable(remainingForWildcard, `${conf} Wild Card Race`, "Top 2 wildcard spots qualify for playoffs", [2])}
+                <div className="wildcard-race-section">
+                  {renderTable(remainingForWildcard, `${conf} Wild Card Race`, "Top 2 wildcard spots qualify for playoffs", [2])}
+                </div>
               </div>
             );
           })}
