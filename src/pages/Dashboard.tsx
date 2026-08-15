@@ -113,39 +113,52 @@ export default function Dashboard() {
 
       let newShots: Shot[] = [];
       if (xgRes && xgRes.ok) {
-        const xgData = await xgRes.json() as { shots: Shot[], winProbability?: { homeProb: number, awayProb: number } };
-        newShots = xgData.shots ?? [];
-        if (xgData.winProbability) {
-          setWinProbability(xgData.winProbability);
-        } else {
+        try {
+          const xgData = await xgRes.json() as { shots: Shot[], winProbability?: { homeProb: number, awayProb: number } };
+          newShots = xgData.shots ?? [];
+          if (xgData.winProbability) {
+            setWinProbability(xgData.winProbability);
+          } else {
+            setWinProbability(null);
+          }
+        } catch (e) {
+          console.warn("Failed to parse xg data", e);
           setWinProbability(null);
         }
       } else {
+        console.warn(`xG fetch failed with status ${xgRes?.status}`);
         setWinProbability(null);
       }
       
-      let actualHomeId: number | null = null; 
+      let actualHomeId: number | null = game.homeTeam?.id ?? null; 
       let currentGameState = game.gameState || "FUT";
 
       if (boxRes && boxRes.ok) {
-        const boxData = await boxRes.json() as {
-          homeTeam?: { id: number, abbrev: string, name?: { default: string } };
-          awayTeam?: { id: number, abbrev: string, name?: { default: string } };
-          gameState?: string;
-        };
-        if (boxData.homeTeam) {
-          actualHomeId = boxData.homeTeam.id;
-          setHomeTeamName(resolveTeamFullName(boxData.homeTeam, boxData.homeTeam.abbrev ?? "Home"));
-          setHomeTeamAbbr(boxData.homeTeam.abbrev ?? "HOME");
-          setHomeTeamId(actualHomeId);
+        try {
+          const boxData = await boxRes.json() as {
+            homeTeam?: { id: number, abbrev: string, name?: { default: string } };
+            awayTeam?: { id: number, abbrev: string, name?: { default: string } };
+            gameState?: string;
+          };
+          if (boxData.gameState) {
+            currentGameState = boxData.gameState;
+          }
+          if (boxData.homeTeam) {
+            actualHomeId = boxData.homeTeam.id ?? actualHomeId;
+            setHomeTeamName(resolveTeamFullName(boxData.homeTeam, boxData.homeTeam.abbrev ?? game.homeTeam?.abbrev ?? "Home"));
+            setHomeTeamAbbr(boxData.homeTeam.abbrev ?? game.homeTeam?.abbrev ?? "HOME");
+            setHomeTeamId(actualHomeId);
+          }
+          if (boxData.awayTeam) {
+            setAwayTeamName(resolveTeamFullName(boxData.awayTeam, boxData.awayTeam.abbrev ?? game.awayTeam?.abbrev ?? "Away"));
+            setAwayTeamAbbr(boxData.awayTeam.abbrev ?? game.awayTeam?.abbrev ?? "AWAY");
+          }
+        } catch (e) {
+          console.warn("Failed to parse boxscore data", e);
         }
-        if (boxData.awayTeam) {
-          setAwayTeamName(resolveTeamFullName(boxData.awayTeam, boxData.awayTeam.abbrev ?? "Away"));
-          setAwayTeamAbbr(boxData.awayTeam.abbrev ?? "AWAY");
-        }
-        if (boxData.gameState) {
-          currentGameState = boxData.gameState;
-        }
+      } else {
+        // Fallback if boxscore fails
+        setHomeTeamId(actualHomeId);
       }
 
       if (matchupsRes && matchupsRes.ok) {
@@ -157,7 +170,10 @@ export default function Dashboard() {
 
       if (newShots.length && actualHomeId === null) {
         const ids = [...new Set(newShots.map(s => s.team_id).filter((id): id is number => id !== null))];
-        if (ids.length) setHomeTeamId(ids[0]);
+        if (ids.length) {
+          actualHomeId = ids[0];
+          setHomeTeamId(actualHomeId);
+        }
       }
 
       setShots(newShots);
