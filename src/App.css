@@ -654,7 +654,6 @@
   border: 1px solid var(--border-primary);
   border-radius: 1rem;
   padding: 1.5rem;
-  overflow: hidden;
 }
 
 .hockey-rink-container {
@@ -669,6 +668,7 @@
   height: auto;
   border-radius: 1rem;
   box-shadow: 0 0 40px rgba(0,0,0,0.6), var(--shadow-lg);
+  overflow: visible;
 }
 
 @keyframes shotEntrance {
@@ -698,7 +698,9 @@
   padding: 0.5rem 0.6rem;
   font-size: 0.35rem;
   color: var(--text-primary);
-  white-space: nowrap;
+  display: inline-block;
+  white-space: normal;
+  box-sizing: border-box;
   box-shadow: 0 4px 20px rgba(0,0,0,0.6);
   backdrop-filter: blur(4px);
 }
@@ -712,6 +714,67 @@
 .shot-tooltip-meta {
   color: var(--text-secondary);
   font-size: 0.3rem;
+  line-height: 1.4;
+}
+
+/* =========================================
+   Hockey Rink Modal
+   ========================================= */
+.hockey-rink-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(5px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+}
+
+.hockey-rink-modal-content {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: 1rem;
+  padding: 2rem;
+  position: relative;
+  width: 100%;
+  max-width: 1200px;
+  max-height: 90vh;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+  display: flex;
+  flex-direction: column;
+}
+
+.hockey-rink-modal-close {
+  position: absolute;
+  top: 1rem;
+  right: 1.5rem;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 2rem;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.hockey-rink-modal-close:hover {
+  color: var(--text-primary);
+}
+
+.hockey-rink-modal-svg-wrapper {
+  width: 100%;
+  flex-grow: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hockey-rink-modal-svg-wrapper .hockey-rink-svg {
+  max-height: 75vh;
 }
 
 /* =========================================

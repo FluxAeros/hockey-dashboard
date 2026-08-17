@@ -1,4 +1,4 @@
-import { useState, useId } from "react";
+import { useId } from "react";
 import type { Shot } from "../types";
 import { xgToRadius } from "../utils/helpers";
 
@@ -7,14 +7,16 @@ interface ShotDotProps {
   isHome: boolean;
   teamColor: string;
   index?: number;
+  isHovered?: boolean;
+  onMouseEnter?: () => void;
+  onMouseLeave?: () => void;
 }
 
-export function ShotDot({ shot, isHome, teamColor, index = 0 }: ShotDotProps) {
-  const [hovered, setHovered] = useState(false);
+export function ShotDot({ shot, isHome, teamColor, index = 0, isHovered = false, onMouseEnter, onMouseLeave }: ShotDotProps) {
   const uid = useId().replace(/:/g, "");
   const xg = shot.xg ?? 0;
   const isGoal = shot.is_goal === 1;
-  const r = xgToRadius(xg);
+  const r = isGoal ? xgToRadius(xg) + 2 : xgToRadius(xg);
 
   const rawX = shot.raw_x ?? 0;
   const rawY = shot.raw_y ?? 0;
@@ -38,8 +40,8 @@ export function ShotDot({ shot, isHome, teamColor, index = 0 }: ShotDotProps) {
 
   return (
     <g
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
       style={{ cursor: "pointer" }}
     >
       <defs>
@@ -50,30 +52,13 @@ export function ShotDot({ shot, isHome, teamColor, index = 0 }: ShotDotProps) {
         </radialGradient>
         {/* Glow filter */}
         <filter id={`glow-${uid}`} x="-80%" y="-80%" width="260%" height="260%">
-          <feGaussianBlur stdDeviation={isGoal ? "1.8" : "0.7"} result="blur" />
+          <feGaussianBlur stdDeviation={isGoal ? "1.5" : "0.7"} result="blur" />
           <feMerge>
             <feMergeNode in="blur" />
             <feMergeNode in="SourceGraphic" />
           </feMerge>
         </filter>
       </defs>
-
-      {/* Outer goal ring pulse */}
-      {isGoal && (
-        <>
-          <circle
-            cx={renderX} cy={renderY} r={r + 4.5}
-            fill="none" stroke={glowColor} strokeWidth="0.6"
-            opacity="0.5"
-            style={{ animation: "pulse 2s ease-out infinite" }}
-          />
-          <circle
-            cx={renderX} cy={renderY} r={r + 2.5}
-            fill="none" stroke={glowColor} strokeWidth="0.8"
-            opacity="0.8"
-          />
-        </>
-      )}
 
       {/* Main shot shape */}
       {isHome ? (
@@ -82,7 +67,7 @@ export function ShotDot({ shot, isHome, teamColor, index = 0 }: ShotDotProps) {
           points={`${renderX},${renderY - r} ${renderX + r},${renderY} ${renderX},${renderY + r} ${renderX - r},${renderY}`}
           fill={`url(#grad-${uid})`}
           stroke={isGoal ? "#FFD700" : teamColor}
-          strokeWidth={isGoal ? "0.8" : "0.3"}
+          strokeWidth={isGoal ? "1.0" : "0.3"}
           strokeOpacity={isGoal ? 1 : 0.6}
           filter={`url(#glow-${uid})`}
           style={{
@@ -95,7 +80,7 @@ export function ShotDot({ shot, isHome, teamColor, index = 0 }: ShotDotProps) {
           cx={renderX} cy={renderY} r={r}
           fill={`url(#grad-${uid})`}
           stroke={isGoal ? "#FFD700" : teamColor}
-          strokeWidth={isGoal ? "0.8" : "0.3"}
+          strokeWidth={isGoal ? "1.0" : "0.3"}
           strokeOpacity={isGoal ? 1 : 0.6}
           filter={`url(#glow-${uid})`}
           style={{
@@ -107,32 +92,36 @@ export function ShotDot({ shot, isHome, teamColor, index = 0 }: ShotDotProps) {
       {/* Goal star marker */}
       {isGoal && (
         <text
-          x={renderX} y={renderY + 0.8}
-          fontSize="2.5"
+          x={renderX} y={renderY + 1}
+          fontSize="4"
           textAnchor="middle"
           dominantBaseline="middle"
-          style={{ userSelect: "none", pointerEvents: "none" }}
+          fill="#FFD700"
+          style={{ userSelect: "none", pointerEvents: "none", filter: "drop-shadow(0px 0px 1px rgba(0,0,0,0.8))" }}
         >★</text>
       )}
 
       {/* Hover tooltip */}
-      {hovered && (
+      {isHovered && (
         <foreignObject
-          x={renderX + r + 1.5} y={renderY - 12}
-          width="40" height="28"
+          x={renderX > 50 ? renderX - 120 - r - 1.5 : renderX + r + 1.5}
+          y={renderY - 16}
+          width="120" height="60"
           style={{ overflow: "visible", pointerEvents: "none" }}
         >
-          <div className="shot-tooltip" style={{ borderColor: teamColor, boxShadow: `0 0 12px ${teamColor}40` }}>
-            <div className="shot-tooltip-title" style={{ color: teamColor }}>
-              {isGoal ? "⚡ GOAL" : "Shot"} — {(xg * 100).toFixed(1)}%
-            </div>
-            <div className="shot-tooltip-meta">
-              {shot.distance != null ? shot.distance.toFixed(1) : "—"} ft
-              {" · "}
-              {shot.angle != null ? Math.abs(shot.angle).toFixed(1) : "—"}°
-              {shot.is_rebound ? " · Rebound" : ""}
-              {shot.is_rush ? " · Rush" : ""}
-              {shot.shot_type && shot.shot_type !== "unknown" ? ` · ${shot.shot_type}` : ""}
+          <div style={{ display: "flex", justifyContent: renderX > 50 ? "flex-end" : "flex-start", width: "100%" }}>
+            <div className="shot-tooltip" style={{ borderColor: teamColor, boxShadow: `0 0 12px ${teamColor}40` }}>
+              <div className="shot-tooltip-title" style={{ color: teamColor }}>
+                {isGoal ? "⚡ GOAL" : "Shot"} — {(xg * 100).toFixed(1)}%
+              </div>
+              <div className="shot-tooltip-meta">
+                {shot.distance != null ? shot.distance.toFixed(1) : "—"} ft
+                {" · "}
+                {shot.angle != null ? Math.abs(shot.angle).toFixed(1) : "—"}°
+                {shot.is_rebound ? " · Rebound" : ""}
+                {shot.is_rush ? " · Rush" : ""}
+                {shot.shot_type && shot.shot_type !== "unknown" ? ` · ${shot.shot_type}` : ""}
+              </div>
             </div>
           </div>
         </foreignObject>
