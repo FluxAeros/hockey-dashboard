@@ -353,7 +353,7 @@ async def get_live_game_xg(game_id: str):
 
     # 1. Check persistent SQLite cache for completed games
     persistent_cached = get_cached_game(f"xg_{gid}")
-    if persistent_cached:
+    if persistent_cached and len(persistent_cached.get("shots", [])) > 0:
         return persistent_cached
 
     # 2. Use in-memory cache with request coalescing
@@ -447,7 +447,7 @@ async def get_live_game_xg(game_id: str):
             "gameState": game_state
         })
 
-        if game_state in ["FINAL", "OFF"]:
+        if game_state in ["FINAL", "OFF"] and len(processed_shots) > 0:
             save_cached_game(f"xg_{gid}", game_state, result)
 
         return result
@@ -505,7 +505,7 @@ async def get_boxscore(game_id: str):
     gid = str(game_id)
 
     persistent_cached = get_cached_game(f"box_{gid}")
-    if persistent_cached:
+    if persistent_cached and (persistent_cached.get("boxscore") or persistent_cached.get("playerByGameStats")):
         return persistent_cached
 
     async def fetch_boxscore():
@@ -516,7 +516,7 @@ async def get_boxscore(game_id: str):
             raise HTTPException(status_code=404, detail="Boxscore not found.")
         data = fix_double_encoding(res.json())
         game_state = data.get("gameState")
-        if game_state in ["FINAL", "OFF"]:
+        if game_state in ["FINAL", "OFF"] and (data.get("boxscore") or data.get("playerByGameStats")):
             save_cached_game(f"box_{gid}", game_state, data)
         return data
 
@@ -528,7 +528,7 @@ async def get_matchups(game_id: str):
     gid = str(game_id)
 
     persistent_cached = get_cached_game(f"matchups_{gid}")
-    if persistent_cached:
+    if persistent_cached and persistent_cached.get("matchups") and len(persistent_cached["matchups"]) > 0:
         return persistent_cached
 
     async def compute_matchups():
@@ -641,7 +641,7 @@ async def get_matchups(game_id: str):
             "team2": {"id": t2_id, "players": build_player_list(t2_matchups)}
         })
 
-        if game_state in ["FINAL", "OFF"]:
+        if game_state in ["FINAL", "OFF"] and (len(matchup_result.get("team1", {}).get("players", [])) > 0 or len(matchup_result.get("team2", {}).get("players", [])) > 0):
             save_cached_game(f"matchups_{gid}", game_state, matchup_result)
 
         return matchup_result
