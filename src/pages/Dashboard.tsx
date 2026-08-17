@@ -97,14 +97,15 @@ export default function Dashboard() {
   }, []);
 
   const [winProbability, setWinProbability] = useState<{ homeProb: number, awayProb: number } | null>(null);
+  const [officialScore, setOfficialScore] = useState<{ homeGoals: number, awayGoals: number, homeShots: number, awayShots: number } | null>(null);
 
   const fetchGameData = useCallback(async (game: NHLGame): Promise<boolean> => {
     const gid = String(game.id);
     try {
       const results = await Promise.allSettled([
-        fetch(`${API_BASE}/game/${gid}`),
-        fetch(`${API_BASE}/boxscore/${gid}`),
-        fetch(`${API_BASE}/matchups/${gid}`)
+        fetch(`${API_BASE}/game/${gid}`, { cache: "no-store" }),
+        fetch(`${API_BASE}/boxscore/${gid}`, { cache: "no-store" }),
+        fetch(`${API_BASE}/matchups/${gid}`, { cache: "no-store" })
       ]);
 
       const xgRes = results[0].status === "fulfilled" ? results[0].value : null;
@@ -136,8 +137,8 @@ export default function Dashboard() {
       if (boxRes && boxRes.ok) {
         try {
           const boxData = await boxRes.json() as {
-            homeTeam?: { id: number, abbrev: string, name?: { default: string } };
-            awayTeam?: { id: number, abbrev: string, name?: { default: string } };
+            homeTeam?: { id: number, abbrev: string, name?: { default: string }, score?: number, sog?: number };
+            awayTeam?: { id: number, abbrev: string, name?: { default: string }, score?: number, sog?: number };
             gameState?: string;
           };
           if (boxData.gameState) {
@@ -152,6 +153,14 @@ export default function Dashboard() {
           if (boxData.awayTeam) {
             setAwayTeamName(resolveTeamFullName(boxData.awayTeam, boxData.awayTeam.abbrev ?? game.awayTeam?.abbrev ?? "Away"));
             setAwayTeamAbbr(boxData.awayTeam.abbrev ?? game.awayTeam?.abbrev ?? "AWAY");
+          }
+          if (boxData.homeTeam && boxData.awayTeam) {
+            setOfficialScore({
+              homeGoals: boxData.homeTeam.score ?? 0,
+              awayGoals: boxData.awayTeam.score ?? 0,
+              homeShots: boxData.homeTeam.sog ?? 0,
+              awayShots: boxData.awayTeam.sog ?? 0
+            });
           }
         } catch (e) {
           console.warn("Failed to parse boxscore data", e);
@@ -269,8 +278,19 @@ export default function Dashboard() {
         if (s.is_goal) awayGoals++;
       }
     });
+
+    if (officialScore) {
+      return { 
+        homeXG, awayXG, 
+        homeShots: officialScore.homeShots || homeShots, 
+        awayShots: officialScore.awayShots || awayShots, 
+        homeGoals: officialScore.homeGoals, 
+        awayGoals: officialScore.awayGoals 
+      };
+    }
+
     return { homeXG, awayXG, homeShots, awayShots, homeGoals, awayGoals };
-  }, [shots, homeTeamId]);
+  }, [shots, homeTeamId, officialScore]);
 
   const s = stats();
 

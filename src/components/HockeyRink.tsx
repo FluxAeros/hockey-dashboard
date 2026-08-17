@@ -65,6 +65,22 @@ export function HockeyRink({ shots, homeTeamId, homeAbbr, awayAbbr }: HockeyRink
         <text x="55" y="1.5" fontSize="4" fill="var(--color-rink-text)" textAnchor="middle" opacity="0.45" fontFamily="sans-serif">HOME ZONE</text>
       </g>
       <g>
+        {shots.length === 0 && (
+          <g style={{ pointerEvents: "none" }}>
+            <rect x="-45" y="-10" width="90" height="20" rx="4" fill="var(--bg-secondary)" opacity="0.9" />
+            <text 
+              x="0" y="1.5" 
+              fontSize="5" 
+              fill="var(--text-primary)" 
+              textAnchor="middle" 
+              dominantBaseline="middle"
+              fontFamily="sans-serif"
+              fontWeight="bold"
+            >
+              Shot location data not available
+            </text>
+          </g>
+        )}
         {displayedShots.map((shot, i) => {
           if (shot.raw_x == null || shot.raw_y == null) return null;
           const isHome = shot.team_id === homeTeamId;
