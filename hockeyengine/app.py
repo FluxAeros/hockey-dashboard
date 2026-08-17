@@ -416,14 +416,22 @@ async def get_live_game_xg(game_id: str):
             xg_diff = home_xg - away_xg
             shots_diff = home_shots - away_shots
             
-            if win_prob_model:
-                features_input = np.array([[score_diff, seconds_remaining, min(period, 3), manpower_diff, xg_diff, shots_diff]])
-                home_prob = float(win_prob_model.predict_proba(features_input)[0][1]) * 100
+            
+            if game_state in ["FINAL", "OFF"]:
+                if home_goals > away_goals:
+                    home_prob = 100.0
+                else:
+                    home_prob = 0.0
             else:
-                logit = 0.14 + (score_diff * 1.35) + (xg_diff * 0.55) + (shots_diff * 0.05)
-                home_prob = (1.0 / (1.0 + np.exp(-logit))) * 100
+                if win_prob_model:
+                    features_input = np.array([[score_diff, seconds_remaining, min(period, 3), manpower_diff, xg_diff, shots_diff]])
+                    home_prob = float(win_prob_model.predict_proba(features_input)[0][1]) * 100
+                else:
+                    logit = 0.14 + (score_diff * 1.35) + (xg_diff * 0.55) + (shots_diff * 0.05)
+                    home_prob = (1.0 / (1.0 + np.exp(-logit))) * 100
+                    
+                home_prob = min(99.5, max(0.5, round(home_prob, 1)))
                 
-            home_prob = min(99.5, max(0.5, round(home_prob, 1)))
             away_prob = round(100.0 - home_prob, 1)
             
             win_probability = {
