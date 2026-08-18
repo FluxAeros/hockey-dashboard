@@ -111,7 +111,7 @@ export function ShotDot({ shot, isHome, teamColor, index = 0, isHovered = false,
           <div style={{ display: "flex", justifyContent: renderX > 50 ? "flex-end" : "flex-start", width: "100%" }}>
             <div className="shot-tooltip" style={{ borderColor: teamColor, boxShadow: `0 0 12px ${teamColor}40` }}>
               <div className="shot-tooltip-title" style={{ color: teamColor }}>
-                {isGoal ? "⚡ GOAL" : "Shot"} — {(xg * 100).toFixed(1)}%
+                {isGoal ? "GOAL" : "Shot"} — {(xg * 100).toFixed(1)}%
               </div>
               <div className="shot-tooltip-meta">
                 {shot.distance != null ? shot.distance.toFixed(1) : "—"} ft
