@@ -36,7 +36,6 @@ export function ShotDot({ shot, isHome, teamColor, index = 0, isHovered = false,
   const renderY = -normY;
 
   // Parse team color to build gradient shades
-  const glowColor = teamColor;
 
   return (
     <g
