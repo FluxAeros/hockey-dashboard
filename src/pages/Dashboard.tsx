@@ -109,6 +109,19 @@ export default function Dashboard() {
   const [goalCelebration, setGoalCelebration] = useState<{ visible: boolean; teamAbbr: string; teamName: string } | null>(null);
   const prevScoreRef = useRef<{ homeGoals: number; awayGoals: number } | null>(null);
 
+  // Preload team logo SVGs to prevent image decode/fetch jank during goal celebration
+  useEffect(() => {
+    if (!selectedGame) return;
+    const homeAbbr = selectedGame.homeTeam?.abbrev;
+    const awayAbbr = selectedGame.awayTeam?.abbrev;
+    [homeAbbr, awayAbbr].forEach((abbr) => {
+      if (abbr) {
+        const img = new Image();
+        img.src = `https://assets.nhle.com/logos/nhl/svg/${abbr}_light.svg`;
+      }
+    });
+  }, [selectedGame]);
+
   const fetchGameData = useCallback(async (game: NHLGame): Promise<boolean> => {
     const gid = String(game.id);
     try {
@@ -176,9 +189,13 @@ export default function Dashboard() {
             const prev = prevScoreRef.current;
             if (prev !== null) {
               if (newHome > prev.homeGoals) {
-                setGoalCelebration({ visible: true, teamAbbr: homeAbbr, teamName: homeFullName });
+                requestAnimationFrame(() => {
+                  setGoalCelebration({ visible: true, teamAbbr: homeAbbr, teamName: homeFullName });
+                });
               } else if (newAway > prev.awayGoals) {
-                setGoalCelebration({ visible: true, teamAbbr: awayAbbr, teamName: awayFullName });
+                requestAnimationFrame(() => {
+                  setGoalCelebration({ visible: true, teamAbbr: awayAbbr, teamName: awayFullName });
+                });
               }
             }
             prevScoreRef.current = { homeGoals: newHome, awayGoals: newAway };
