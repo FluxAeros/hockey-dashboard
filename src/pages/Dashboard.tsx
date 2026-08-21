@@ -367,6 +367,13 @@ export default function Dashboard() {
             <ChevronRight size={18} />
           </button>
           <button
+            onClick={() => setSelectedDate(todayDateString())}
+            className="btn-secondary"
+            style={{ display: selectedDate !== todayDateString() ? "block" : "none" }}
+          >
+            Today
+          </button>
+          <button
             onClick={() => fetchSchedule(selectedDate)}
             disabled={scheduleLoading || isJumping}
             className="btn-primary"

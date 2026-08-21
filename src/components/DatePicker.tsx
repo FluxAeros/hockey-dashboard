@@ -162,6 +162,21 @@ export function DatePicker({ value, onChange }: DatePickerProps) {
               );
             })}
           </div>
+          <div style={{ marginTop: "0.5rem", paddingTop: "0.5rem", borderTop: "1px solid var(--border-primary)", display: "flex", justifyContent: "center" }}>
+            <button
+              className="btn-secondary"
+              style={{ padding: "0.25rem 1rem", fontSize: "0.75rem", width: "100%" }}
+              onClick={() => {
+                const yyyy = today.getFullYear();
+                const mm = String(today.getMonth() + 1).padStart(2, "0");
+                const dd = String(today.getDate()).padStart(2, "0");
+                onChange(`${yyyy}-${mm}-${dd}`);
+                setOpen(false);
+              }}
+            >
+              Today
+            </button>
+          </div>
         </div>
       )}
     </div>
