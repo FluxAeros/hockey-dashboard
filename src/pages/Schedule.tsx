@@ -20,7 +20,13 @@ export default function Schedule() {
   const navigate = useNavigate();
   const { favorites, isFavorite } = useAuth();
 
-  const [currentDate, setCurrentDate] = useState<string>(todayDateString());
+  const [currentDate, setCurrentDate] = useState<string>(() => {
+    return sessionStorage.getItem("schedule_date") || todayDateString();
+  });
+
+  useEffect(() => {
+    sessionStorage.setItem("schedule_date", currentDate);
+  }, [currentDate]);
   const [scheduleWeek, setScheduleWeek] = useState<GameDay[]>([]);
   const [nextStartDate, setNextStartDate] = useState<string | null>(null);
   const [previousStartDate, setPreviousStartDate] = useState<string | null>(null);

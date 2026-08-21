@@ -72,9 +72,7 @@ export function DatePicker({ value, onChange }: DatePickerProps) {
   const today = new Date();
   const daysInMonth = viewYear ? getDaysInMonth(viewYear, viewMonth) : 0;
   const firstDay   = viewYear ? getFirstDayOfMonth(viewYear, viewMonth) : 0;
-  const monthLabel = viewYear
-    ? new Date(viewYear, viewMonth, 1).toLocaleDateString(undefined, { month: "long", year: "numeric" })
-    : "";
+
 
   const displayLabel = new Date(value + "T12:00:00").toLocaleDateString(undefined, {
     weekday: "short", month: "short", day: "numeric",
@@ -94,7 +92,31 @@ export function DatePicker({ value, onChange }: DatePickerProps) {
             <button className="datepicker-nav" onClick={prevMonth} aria-label="Previous month">
               <ChevronLeft size={16} />
             </button>
-            <span className="datepicker-month-label">{monthLabel}</span>
+            <div style={{ display: "flex", gap: "0.25rem", alignItems: "center" }}>
+              <select 
+                value={viewMonth} 
+                onChange={(e) => setViewMonth(Number(e.target.value))}
+                className="datepicker-select"
+                aria-label="Select month"
+              >
+                {Array.from({ length: 12 }).map((_, i) => (
+                  <option key={i} value={i}>
+                    {new Date(0, i).toLocaleString(undefined, { month: 'short' })}
+                  </option>
+                ))}
+              </select>
+              <select 
+                value={viewYear} 
+                onChange={(e) => setViewYear(Number(e.target.value))}
+                className="datepicker-select"
+                aria-label="Select year"
+              >
+                {Array.from({ length: 15 }).map((_, i) => {
+                  const y = today.getFullYear() - 7 + i; // +/- 7 years
+                  return <option key={y} value={y}>{y}</option>;
+                })}
+              </select>
+            </div>
             <button className="datepicker-nav" onClick={nextMonth} aria-label="Next month">
               <ChevronRight size={16} />
             </button>

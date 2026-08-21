@@ -216,6 +216,29 @@
   letter-spacing: -0.01em;
 }
 
+.datepicker-select {
+  background: transparent;
+  color: var(--text-primary);
+  border: 1px solid transparent;
+  outline: none;
+  font-size: 0.875rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0.15rem 0.25rem;
+  border-radius: 0.3rem;
+  font-family: inherit;
+  transition: all 0.2s;
+}
+
+.datepicker-select:hover, .datepicker-select:focus {
+  background: var(--bg-tertiary);
+}
+
+.datepicker-select option {
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+}
+
 .datepicker-nav {
   display: flex;
   align-items: center;

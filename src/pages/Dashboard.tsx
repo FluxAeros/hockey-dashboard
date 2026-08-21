@@ -30,9 +30,13 @@ export default function Dashboard() {
   const location = useLocation();
   const navigate = useNavigate();
   
-  const [selectedDate, setSelectedDate] = useState<string>(
-    location.state?.selectedDate || todayDateString()
-  );
+  const [selectedDate, setSelectedDate] = useState<string>(() => {
+    return location.state?.selectedDate || sessionStorage.getItem("dashboard_date") || todayDateString();
+  });
+
+  useEffect(() => {
+    sessionStorage.setItem("dashboard_date", selectedDate);
+  }, [selectedDate]);
   const [scheduleGames, setScheduleGames] = useState<NHLGame[]>([]);
   const [scheduleWeek, setScheduleWeek] = useState<any[]>([]);
   const [nextStartDate, setNextStartDate] = useState<string | null>(null);
