@@ -422,6 +422,30 @@ async def get_live_game_xg(game_id: str):
                     home_prob = 100.0
                 else:
                     home_prob = 0.0
+                away_prob = round(100.0 - home_prob, 1)
+                win_probability = {"homeProb": home_prob, "awayProb": away_prob}
+            elif game_state in ["FUT", "PRE"] or not plays:
+                try:
+                    standings_data = await get_standings_now()
+                    standings_list = standings_data.get("standings", [])
+                    home_abbrev = raw_json.get('homeTeam', {}).get('abbrev', '')
+                    away_abbrev = raw_json.get('awayTeam', {}).get('abbrev', '')
+                    
+                    home_pctg = 0.5
+                    away_pctg = 0.5
+                    for t in standings_list:
+                        if t.get("teamAbbrev", {}).get("default") == home_abbrev:
+                            home_pctg = t.get("pointPctg", 0.5)
+                        if t.get("teamAbbrev", {}).get("default") == away_abbrev:
+                            away_pctg = t.get("pointPctg", 0.5)
+                            
+                    logit = 0.14 + (home_pctg - away_pctg) * 3.5
+                    home_prob = (1.0 / (1.0 + np.exp(-logit))) * 100
+                    home_prob = min(99.5, max(0.5, round(home_prob, 1)))
+                    away_prob = round(100.0 - home_prob, 1)
+                    win_probability = {"homeProb": home_prob, "awayProb": away_prob}
+                except Exception:
+                    win_probability = None
             else:
                 if win_prob_model:
                     features_input = np.array([[score_diff, seconds_remaining, min(period, 3), manpower_diff, xg_diff, shots_diff]])
@@ -431,13 +455,8 @@ async def get_live_game_xg(game_id: str):
                     home_prob = (1.0 / (1.0 + np.exp(-logit))) * 100
                     
                 home_prob = min(99.5, max(0.5, round(home_prob, 1)))
-                
-            away_prob = round(100.0 - home_prob, 1)
-            
-            win_probability = {
-                "homeProb": home_prob,
-                "awayProb": away_prob
-            }
+                away_prob = round(100.0 - home_prob, 1)
+                win_probability = {"homeProb": home_prob, "awayProb": away_prob}
         except Exception:
             pass
 
