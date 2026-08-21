@@ -1076,10 +1076,7 @@
   position: relative;
 }
 
-.team-card-btn:hover {
-  box-shadow: var(--shadow-lg);
-  border-color: var(--text-tertiary) !important;
-}
+
 
 .team-card-cup-badge {
   position: absolute;

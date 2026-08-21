@@ -190,7 +190,13 @@ export default function Teams() {
                     role="button"
                     tabIndex={0}
                     onKeyDown={(e) => { if (e.key === 'Enter') handleCardClick(team.teamAbbrev); }}
-                    whileHover={{ scale: 1.03, y: -4, transition: { type: "spring", stiffness: 380, damping: 22 } }}
+                    whileHover={{ 
+                      scale: 1.03, 
+                      y: -4, 
+                      borderColor: color,
+                      boxShadow: `0 12px 28px -6px ${color}55, 0 8px 14px -4px ${color}33`,
+                      transition: { type: "spring", stiffness: 380, damping: 22 } 
+                    }}
                     whileTap={{ scale: 0.97, transition: { type: "spring", stiffness: 500, damping: 28 } }}
                     style={{ 
                       backgroundColor: 'var(--bg-secondary)', 
