@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { RosterCard, type RosterPlayer } from "../components/RosterCard";
 import { TEAM_COLORS } from "../utils/helpers";
-import { NHL_TEAMS, TEAM_CONFERENCE, STANLEY_CUPS } from "../utils/teamsData";
+import { NHL_TEAMS, TEAM_CONFERENCE, STANLEY_CUPS, getTeamCityAndMascot } from "../utils/teamsData";
 import { TEAM_DESCRIPTIONS } from "../utils/teamDescriptions";
 import { ArrowLeft, X, Trophy, Star, ChevronDown, ChevronUp } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -228,9 +228,9 @@ export default function Teams() {
                     <motion.div layoutId={`team-content-${team.teamAbbrev}`} className="team-card-content">
                       <motion.img layoutId={`team-logo-${team.teamAbbrev}`} src={team.teamLogo} alt={team.teamName} className="team-logo-img" />
                       <motion.div layoutId={`team-text-${team.teamAbbrev}`} className="team-card-text">
-                        <span className="team-card-city">{team.teamName.split(' ').slice(0, -1).join(' ')}</span>
+                        <span className="team-card-city">{getTeamCityAndMascot(team.teamAbbrev, team.teamName).city}</span>
                         <span className="team-card-mascot" style={{ color: color !== 'var(--border-primary)' ? color : 'var(--text-primary)' }}>
-                          {team.teamName.split(' ').slice(-1).join(' ')}
+                          {getTeamCityAndMascot(team.teamAbbrev, team.teamName).mascot}
                         </span>
                       </motion.div>
                     </motion.div>
@@ -254,11 +254,11 @@ export default function Teams() {
             transition={{ duration: 0.15 }}
           >
             <motion.button 
-              className="back-btn" 
-              onClick={handleBack}
-              initial={{ opacity: 0, x: -16 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ type: "spring", stiffness: 320, damping: 26, delay: 0.15 }}
+            className="back-btn" 
+            onClick={handleBack}
+            initial={{ opacity: 0, x: -16 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ type: "spring", stiffness: 320, damping: 26, delay: 0.15 }}
             >
               <ArrowLeft size={20} />
               <span>Back to Teams</span>
@@ -277,9 +277,9 @@ export default function Teams() {
               <motion.div layoutId={`team-content-${selectedTeam}`} className="team-hero-header">
                 <motion.img layoutId={`team-logo-${selectedTeam}`} src={activeTeamInfo?.teamLogo} alt={activeTeamInfo?.teamName} className="team-hero-logo" />
                 <motion.div layoutId={`team-text-${selectedTeam}`} className="team-hero-title">
-                  <h1 className="team-hero-city">{activeTeamInfo?.teamName.split(' ').slice(0, -1).join(' ')}</h1>
+                  <h1 className="team-hero-city">{getTeamCityAndMascot(selectedTeam, activeTeamInfo?.teamName).city}</h1>
                   <h1 className="team-hero-mascot" style={{ color: activeColor }}>
-                    {activeTeamInfo?.teamName.split(' ').slice(-1).join(' ')}
+                    {getTeamCityAndMascot(selectedTeam, activeTeamInfo?.teamName).mascot}
                   </h1>
                   {selectedTeam && (STANLEY_CUPS[selectedTeam]?.length ?? 0) > 0 && (
                     <div className="team-hero-cups">

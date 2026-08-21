@@ -46,6 +46,59 @@ export const STANLEY_CUPS: Record<string, number[]> = {
   CGY: [1989],
 };
 
+export interface TeamNameParts {
+  city: string;
+  mascot: string;
+}
+
+export const TEAM_NAME_PARTS: Record<string, TeamNameParts> = {
+  ANA: { city: "Anaheim", mascot: "Ducks" },
+  BOS: { city: "Boston", mascot: "Bruins" },
+  BUF: { city: "Buffalo", mascot: "Sabres" },
+  CAR: { city: "Carolina", mascot: "Hurricanes" },
+  CBJ: { city: "Columbus", mascot: "Blue Jackets" },
+  CGY: { city: "Calgary", mascot: "Flames" },
+  CHI: { city: "Chicago", mascot: "Blackhawks" },
+  COL: { city: "Colorado", mascot: "Avalanche" },
+  DAL: { city: "Dallas", mascot: "Stars" },
+  DET: { city: "Detroit", mascot: "Red Wings" },
+  EDM: { city: "Edmonton", mascot: "Oilers" },
+  FLA: { city: "Florida", mascot: "Panthers" },
+  LAK: { city: "Los Angeles", mascot: "Kings" },
+  MIN: { city: "Minnesota", mascot: "Wild" },
+  MTL: { city: "Montréal", mascot: "Canadiens" },
+  NJD: { city: "New Jersey", mascot: "Devils" },
+  NSH: { city: "Nashville", mascot: "Predators" },
+  NYI: { city: "New York", mascot: "Islanders" },
+  NYR: { city: "New York", mascot: "Rangers" },
+  OTT: { city: "Ottawa", mascot: "Senators" },
+  PHI: { city: "Philadelphia", mascot: "Flyers" },
+  PIT: { city: "Pittsburgh", mascot: "Penguins" },
+  SEA: { city: "Seattle", mascot: "Kraken" },
+  SJS: { city: "San Jose", mascot: "Sharks" },
+  STL: { city: "St. Louis", mascot: "Blues" },
+  TBL: { city: "Tampa Bay", mascot: "Lightning" },
+  TOR: { city: "Toronto", mascot: "Maple Leafs" },
+  UTA: { city: "Utah", mascot: "Mammoth" },
+  VAN: { city: "Vancouver", mascot: "Canucks" },
+  VGK: { city: "Vegas", mascot: "Golden Knights" },
+  WPG: { city: "Winnipeg", mascot: "Jets" },
+  WSH: { city: "Washington", mascot: "Capitals" },
+};
+
+export function getTeamCityAndMascot(teamAbbrev?: string, fallbackFullName?: string): TeamNameParts {
+  if (teamAbbrev && TEAM_NAME_PARTS[teamAbbrev]) {
+    return TEAM_NAME_PARTS[teamAbbrev];
+  }
+  if (!fallbackFullName) return { city: teamAbbrev || "", mascot: "" };
+  const parts = fallbackFullName.split(" ");
+  if (parts.length <= 1) return { city: fallbackFullName, mascot: "" };
+  return {
+    city: parts.slice(0, -1).join(" "),
+    mascot: parts.slice(-1).join(" "),
+  };
+}
+
 export const NHL_TEAMS: TeamInfo[] = [
   {
     "teamAbbrev": "ANA",
