@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { Fragment, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { NHL_TEAMS } from "../utils/teamsData";
 
@@ -65,6 +65,42 @@ export function GoalCelebration({ visible, teamAbbr, teamColor, teamName, onDone
             animate={{ opacity: [0, 1, 0.6, 1, 0.4, 0] }}
             transition={{ duration: 3, times: [0, 0.1, 0.3, 0.5, 0.75, 1], ease: "easeOut" }}
           />
+
+          {/* Racing border — shoots clockwise around the viewport, 2 laps */}
+          {[0, 1].map((lap) => {
+            const base = lap * 0.55;
+            const seg = 0.18; // duration of each side in seconds
+            const borderW = 4;
+            const glow = `0 0 12px 3px ${teamColor}, 0 0 24px 6px ${teamColor}88`;
+            return (
+              <Fragment key={`lap-${lap}`}>
+                {/* Top: left → right */}
+                <motion.div style={{ position: "fixed", top: 0, left: 0, height: borderW, width: "100%", background: teamColor, boxShadow: glow, zIndex: 9998, pointerEvents: "none", transformOrigin: "left center" }}
+                  initial={{ scaleX: 0, opacity: 1 }}
+                  animate={{ scaleX: [0, 1, 1], opacity: [1, 1, 0] }}
+                  transition={{ duration: seg * 1.1, delay: base, ease: "easeInOut", times: [0, 0.85, 1] }}
+                />
+                {/* Right: top → bottom */}
+                <motion.div style={{ position: "fixed", top: 0, right: 0, width: borderW, height: "100%", background: teamColor, boxShadow: glow, zIndex: 9998, pointerEvents: "none", transformOrigin: "center top" }}
+                  initial={{ scaleY: 0, opacity: 1 }}
+                  animate={{ scaleY: [0, 1, 1], opacity: [1, 1, 0] }}
+                  transition={{ duration: seg * 1.1, delay: base + seg, ease: "easeInOut", times: [0, 0.85, 1] }}
+                />
+                {/* Bottom: right → left */}
+                <motion.div style={{ position: "fixed", bottom: 0, right: 0, height: borderW, width: "100%", background: teamColor, boxShadow: glow, zIndex: 9998, pointerEvents: "none", transformOrigin: "right center" }}
+                  initial={{ scaleX: 0, opacity: 1 }}
+                  animate={{ scaleX: [0, 1, 1], opacity: [1, 1, 0] }}
+                  transition={{ duration: seg * 1.1, delay: base + seg * 2, ease: "easeInOut", times: [0, 0.85, 1] }}
+                />
+                {/* Left: bottom → top */}
+                <motion.div style={{ position: "fixed", bottom: 0, left: 0, width: borderW, height: "100%", background: teamColor, boxShadow: glow, zIndex: 9998, pointerEvents: "none", transformOrigin: "center bottom" }}
+                  initial={{ scaleY: 0, opacity: 1 }}
+                  animate={{ scaleY: [0, 1, 1], opacity: [1, 1, 0] }}
+                  transition={{ duration: seg * 1.1, delay: base + seg * 3, ease: "easeInOut", times: [0, 0.85, 1] }}
+                />
+              </Fragment>
+            );
+          })}
 
           {/* Dark backdrop */}
           <motion.div
@@ -164,21 +200,6 @@ export function GoalCelebration({ visible, teamAbbr, teamColor, teamName, onDone
                 transition={{ delay: 0.3, duration: 0.4 }}
               >
                 {teamName}
-              </motion.div>
-
-              {/* Tap to dismiss hint */}
-              <motion.div
-                style={{
-                  marginTop: "2rem",
-                  fontSize: "0.8rem",
-                  color: "rgba(255,255,255,0.4)",
-                  userSelect: "none",
-                }}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.8 }}
-              >
-                Tap anywhere to dismiss
               </motion.div>
             </div>
           </motion.div>
