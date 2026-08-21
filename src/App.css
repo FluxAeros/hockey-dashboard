@@ -1272,6 +1272,7 @@
   flex-direction: column;
   gap: 1.5rem;
   background-color: var(--bg-primary);
+  padding-bottom: 2rem;
 }
 
 .back-btn {
@@ -1377,7 +1378,7 @@
   inset: 0;
   background-color: rgba(0, 0, 0, 0.7);
   backdrop-filter: blur(4px);
-  z-index: 50;
+  z-index: 150;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1814,7 +1815,7 @@
     top: 0;
     left: 0;
     right: 0;
-    padding: 1rem 1rem 0;
+    padding: 1rem 1rem calc(5rem + env(safe-area-inset-bottom));
   }
 
   .back-btn {
