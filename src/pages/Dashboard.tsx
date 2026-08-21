@@ -10,6 +10,8 @@ import { FollowedTeamsWidget } from "../components/FollowedTeamsWidget";
 import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from "lucide-react";
 import { DatePicker } from "../components/DatePicker";
 import { NHL_TEAMS_METADATA } from "../utils/nhlDivisions";
+import { TEAM_COLORS } from "../utils/helpers";
+import { GoalCelebration } from "../components/GoalCelebration";
 import { API_BASE } from "../utils/api";
 
 const REFRESH_INTERVAL = 30000;
@@ -103,6 +105,10 @@ export default function Dashboard() {
   const [winProbability, setWinProbability] = useState<{ homeProb: number, awayProb: number } | null>(null);
   const [officialScore, setOfficialScore] = useState<{ homeGoals: number, awayGoals: number, homeShots: number, awayShots: number } | null>(null);
 
+  // Goal celebration state
+  const [goalCelebration, setGoalCelebration] = useState<{ visible: boolean; teamAbbr: string; teamName: string } | null>(null);
+  const prevScoreRef = useRef<{ homeGoals: number; awayGoals: number } | null>(null);
+
   const fetchGameData = useCallback(async (game: NHLGame): Promise<boolean> => {
     const gid = String(game.id);
     try {
@@ -159,9 +165,27 @@ export default function Dashboard() {
             setAwayTeamAbbr(boxData.awayTeam.abbrev ?? game.awayTeam?.abbrev ?? "AWAY");
           }
           if (boxData.homeTeam && boxData.awayTeam) {
+            const newHome = boxData.homeTeam.score ?? 0;
+            const newAway = boxData.awayTeam.score ?? 0;
+            const homeAbbr = boxData.homeTeam.abbrev ?? game.homeTeam?.abbrev ?? "HOME";
+            const awayAbbr = boxData.awayTeam.abbrev ?? game.awayTeam?.abbrev ?? "AWAY";
+            const homeFullName = resolveTeamFullName(boxData.homeTeam, homeAbbr);
+            const awayFullName = resolveTeamFullName(boxData.awayTeam, awayAbbr);
+
+            // Goal detection: compare against previous known score
+            const prev = prevScoreRef.current;
+            if (prev !== null) {
+              if (newHome > prev.homeGoals) {
+                setGoalCelebration({ visible: true, teamAbbr: homeAbbr, teamName: homeFullName });
+              } else if (newAway > prev.awayGoals) {
+                setGoalCelebration({ visible: true, teamAbbr: awayAbbr, teamName: awayFullName });
+              }
+            }
+            prevScoreRef.current = { homeGoals: newHome, awayGoals: newAway };
+
             setOfficialScore({
-              homeGoals: boxData.homeTeam.score ?? 0,
-              awayGoals: boxData.awayTeam.score ?? 0,
+              homeGoals: newHome,
+              awayGoals: newAway,
               homeShots: boxData.homeTeam.sog ?? 0,
               awayShots: boxData.awayTeam.sog ?? 0
             });
@@ -253,6 +277,8 @@ export default function Dashboard() {
     setAwayTeamAbbr(game.awayTeam?.abbrev ?? "AWAY");
     setGameStatus("loading");
     setStatusMsg("Loading…");
+    prevScoreRef.current = null;
+    setGoalCelebration(null);
     const gameIsLive = await fetchGameData(game);
     if (gameIsLive) {
       startPolling(game);
@@ -490,8 +516,36 @@ export default function Dashboard() {
             {lastUpdated && (
               <span className="status-text">Updated {lastUpdated.toLocaleTimeString()}</span>
             )}
+            {/* Test button – always visible when game loaded */}
+            <button
+              className="btn-secondary"
+              style={{ opacity: 0.6, fontSize: "0.75rem" }}
+              title="Test the goal celebration animation"
+              onClick={() => {
+                // Alternate between home and away for testing
+                const useHome = Math.random() > 0.5;
+                setGoalCelebration({
+                  visible: true,
+                  teamAbbr: useHome ? homeTeamAbbr : awayTeamAbbr,
+                  teamName: useHome ? homeTeamName : awayTeamName,
+                });
+              }}
+            >
+              🎯 Test Goal
+            </button>
           </div>
         </div>
+      )}
+
+      {/* Goal celebration overlay */}
+      {goalCelebration && (
+        <GoalCelebration
+          visible={goalCelebration.visible}
+          teamAbbr={goalCelebration.teamAbbr}
+          teamColor={TEAM_COLORS[goalCelebration.teamAbbr] || "#ffffff"}
+          teamName={goalCelebration.teamName}
+          onDone={() => setGoalCelebration(null)}
+        />
       )}
 
       {selectedGame && (
