@@ -197,7 +197,7 @@
   border: 1px solid var(--border-primary);
   border-radius: 1rem;
   padding: 1rem;
-  width: 280px;
+  width: 290px;
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
   animation: dpFadeIn 0.15s ease;
 }
@@ -206,37 +206,63 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 0.4rem;
   margin-bottom: 0.75rem;
 }
 
-.datepicker-month-label {
-  font-size: 0.875rem;
-  font-weight: 700;
-  color: var(--text-primary);
-  letter-spacing: -0.01em;
+.datepicker-selectors {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex: 1;
+  justify-content: center;
 }
 
 .datepicker-select {
-  background: transparent;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-color: var(--bg-tertiary);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.45rem center;
+  background-size: 9px;
   color: var(--text-primary);
-  border: 1px solid transparent;
-  outline: none;
-  font-size: 0.875rem;
-  font-weight: 700;
+  border: 1px solid var(--border-primary);
+  border-radius: 0.45rem;
+  padding: 0.3rem 1.35rem 0.3rem 0.55rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
   cursor: pointer;
-  padding: 0.15rem 0.25rem;
-  border-radius: 0.3rem;
   font-family: inherit;
-  transition: all 0.2s;
+  transition: border-color 0.15s, background-color 0.15s, box-shadow 0.15s;
+  line-height: 1.2;
 }
 
-.datepicker-select:hover, .datepicker-select:focus {
-  background: var(--bg-tertiary);
+.datepicker-select.month-select {
+  min-width: 5.4rem;
+}
+
+.datepicker-select.year-select {
+  min-width: 4.6rem;
+}
+
+.datepicker-select:hover {
+  border-color: var(--accent-primary);
+  background-color: var(--bg-primary);
+}
+
+.datepicker-select:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
+  background-color: var(--bg-primary);
 }
 
 .datepicker-select option {
   color: var(--text-primary);
-  background: var(--bg-secondary);
+  background-color: var(--bg-secondary);
+  padding: 0.35rem 0.5rem;
 }
 
 .datepicker-nav {

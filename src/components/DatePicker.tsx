@@ -16,6 +16,10 @@ function getFirstDayOfMonth(year: number, month: number) {
   return new Date(year, month, 1).getDay();
 }
 
+const START_YEAR = 1917; // NHL founding year
+const END_YEAR = new Date().getFullYear() + 2;
+const YEARS = Array.from({ length: END_YEAR - START_YEAR + 1 }, (_, i) => START_YEAR + i);
+
 export function DatePicker({ value, onChange }: DatePickerProps) {
   const [open, setOpen] = useState(false);
   const [viewYear, setViewYear] = useState(0);
@@ -92,11 +96,11 @@ export function DatePicker({ value, onChange }: DatePickerProps) {
             <button className="datepicker-nav" onClick={prevMonth} aria-label="Previous month">
               <ChevronLeft size={16} />
             </button>
-            <div style={{ display: "flex", gap: "0.25rem", alignItems: "center" }}>
+            <div className="datepicker-selectors">
               <select 
                 value={viewMonth} 
                 onChange={(e) => setViewMonth(Number(e.target.value))}
-                className="datepicker-select"
+                className="datepicker-select month-select"
                 aria-label="Select month"
               >
                 {Array.from({ length: 12 }).map((_, i) => (
@@ -108,13 +112,12 @@ export function DatePicker({ value, onChange }: DatePickerProps) {
               <select 
                 value={viewYear} 
                 onChange={(e) => setViewYear(Number(e.target.value))}
-                className="datepicker-select"
+                className="datepicker-select year-select"
                 aria-label="Select year"
               >
-                {Array.from({ length: 15 }).map((_, i) => {
-                  const y = today.getFullYear() - 7 + i; // +/- 7 years
-                  return <option key={y} value={y}>{y}</option>;
-                })}
+                {YEARS.map((y) => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
               </select>
             </div>
             <button className="datepicker-nav" onClick={nextMonth} aria-label="Next month">
