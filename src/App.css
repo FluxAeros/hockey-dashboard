@@ -1349,6 +1349,7 @@
 }
 
 .team-hero-header {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 2rem;
@@ -2742,10 +2743,12 @@
   background: linear-gradient(180deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.8) 100%);
   border: 1px solid var(--border-primary);
   border-radius: 0.75rem;
-  padding: 1.25rem;
+  padding: 1.15rem 1.25rem;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  transition: padding 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              border-color 0.2s ease,
+              background 0.3s ease;
 }
 
 .followed-hub-empty {
@@ -2983,6 +2986,29 @@
   white-space: nowrap;
 }
 
+.badge-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  background-color: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  font-size: 0.65rem;
+  font-weight: 800;
+  padding: 0.1rem 0.35rem;
+  border-radius: 0.25rem;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+}
+
+.badge-live-dot {
+  width: 5px;
+  height: 5px;
+  background-color: #ef4444;
+  border-radius: 50%;
+  animation: pulse 1.5s infinite;
+}
+
 .followed-standings-list {
   display: flex;
   flex-direction: column;
@@ -3203,29 +3229,109 @@
   background-color: rgba(245, 158, 11, 0.15);
 }
 
-.team-hero-fav-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  background-color: var(--bg-tertiary);
-  color: var(--text-primary);
+/* Team Hero Star Button (top-right corner) */
+.team-hero-star-btn {
+  position: absolute;
+  top: 0;
+  right: 0;
+  background-color: rgba(15, 23, 42, 0.6);
   border: 1px solid var(--border-primary);
-  padding: 0.4rem 0.85rem;
-  border-radius: 0.5rem;
-  font-size: 0.85rem;
-  font-weight: 600;
-  margin-top: 0.75rem;
-  transition: all 0.15s;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-tertiary);
+  transition: all 0.2s ease;
+  z-index: 5;
+  cursor: pointer;
 }
 
-.team-hero-fav-btn:hover {
-  border-color: #f59e0b;
-}
-
-.team-hero-fav-btn.active {
-  background-color: rgba(245, 158, 11, 0.15);
+.team-hero-star-btn:hover {
+  transform: scale(1.15);
   color: #f59e0b;
   border-color: #f59e0b;
+  background-color: rgba(245, 158, 11, 0.1);
+}
+
+.team-hero-star-btn.active {
+  color: #f59e0b;
+  border-color: #f59e0b;
+  background-color: rgba(245, 158, 11, 0.15);
+}
+
+.team-hero-star-btn.active:hover {
+  background-color: rgba(245, 158, 11, 0.25);
+}
+
+/* Peek & Expand Team Description */
+.team-description-peek-container {
+  cursor: default;
+  outline: none;
+  border-radius: 0.75rem;
+  padding: 1rem 1.25rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  transition: background 0.3s ease, border-color 0.3s ease;
+}
+
+.team-description-peek-container:hover,
+.team-description-peek-container:focus-within {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.team-description-peek-title {
+  display: block;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+  font-family: inherit;
+}
+
+.team-description-peek {
+  position: relative;
+  max-height: 4.5em;
+  overflow: hidden;
+  transition: max-height 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.team-description-peek::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2.5em;
+  background: linear-gradient(to bottom, transparent, var(--bg-secondary));
+  pointer-events: none;
+  transition: opacity 0.4s ease;
+  opacity: 1;
+}
+
+.team-description-peek-container:hover .team-description-peek,
+.team-description-peek-container:focus-within .team-description-peek {
+  max-height: 500px;
+}
+
+.team-description-peek-container:hover .team-description-peek::after,
+.team-description-peek-container:focus-within .team-description-peek::after {
+  opacity: 0;
+}
+
+.team-description-peek-label {
+  display: block;
+  margin-top: 0.4rem;
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  transition: opacity 0.3s ease;
+  opacity: 0.7;
+}
+
+.team-description-peek-container:hover .team-description-peek-label,
+.team-description-peek-container:focus-within .team-description-peek-label {
+  opacity: 0;
 }
 
 .text-amber {
@@ -3270,8 +3376,7 @@
    ========================================= */
 
 .followed-hub-collapsed {
-  padding: 0.65rem 1rem !important;
-  margin-bottom: 1rem !important;
+  padding: 0.75rem 1.25rem !important;
 }
 
 .followed-hub-chips-wrapper {
@@ -3299,12 +3404,29 @@
   color: var(--text-primary);
 }
 
+.followed-hub-chevron {
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: block;
+}
+
+.followed-hub-chevron.open {
+  transform: rotate(180deg);
+}
+
 .followed-hub-title-group {
   display: flex;
   align-items: center;
   gap: 0.5rem;
   cursor: pointer;
   user-select: none;
+  flex-shrink: 0;
+}
+
+.followed-hub-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding-top: 0.85rem;
 }
 
 .mobile-swipe-indicator {

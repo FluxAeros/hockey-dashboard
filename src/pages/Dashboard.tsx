@@ -155,7 +155,7 @@ export default function Dashboard() {
       }
       
       let actualHomeId: number | null = game.homeTeam?.id ?? null; 
-      let currentGameState = game.gameState || "FUT";
+      let currentGameState = game.gameState;
 
       if (boxRes && boxRes.ok) {
         try {

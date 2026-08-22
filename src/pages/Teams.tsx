@@ -4,7 +4,7 @@ import { RosterCard, type RosterPlayer } from "../components/RosterCard";
 import { TEAM_COLORS } from "../utils/helpers";
 import { NHL_TEAMS, TEAM_CONFERENCE, STANLEY_CUPS, getTeamCityAndMascot } from "../utils/teamsData";
 import { TEAM_DESCRIPTIONS } from "../utils/teamDescriptions";
-import { ArrowLeft, X, Trophy, Star, ChevronDown, ChevronUp } from "lucide-react";
+import { ArrowLeft, X, Trophy, Star } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "../context/AuthContext";
 
@@ -42,7 +42,6 @@ export default function Teams() {
   const [raisingTeam, setRaisingTeam] = useState<string | null>(null);
   const [conferenceFilter, setConferenceFilter] = useState<"All" | "Eastern" | "Western">("All");
   const [rosterTab, setRosterTab] = useState<"forwards" | "defensemen" | "goalies">("forwards");
-  const [showDescription, setShowDescription] = useState<boolean>(false);
   const hasAnimatedGrid = useRef(false);
   
   const [roster, setRoster] = useState<{
@@ -65,7 +64,6 @@ export default function Teams() {
     setError(null);
     setRoster(null);
     setRosterTab("forwards");
-    setShowDescription(false);
     try {
       const res = await fetch(`${API_BASE}/roster/${abbr}`);
       if (res.status === 429) throw new Error("Too many requests to NHL API. Please wait a moment.");
@@ -292,16 +290,16 @@ export default function Teams() {
                       </span>
                     </div>
                   )}
-                  {selectedTeam && (
-                    <button
-                      className={`team-hero-fav-btn ${isFavorite(selectedTeam) ? 'active' : ''}`}
-                      onClick={() => toggleFavorite(selectedTeam)}
-                    >
-                      <Star size={16} className={isFavorite(selectedTeam) ? "fill-amber text-amber" : ""} />
-                      <span>{isFavorite(selectedTeam) ? "Following Team" : "Follow Team"}</span>
-                    </button>
-                  )}
                 </motion.div>
+                {selectedTeam && (
+                  <button
+                    className={`team-hero-star-btn ${isFavorite(selectedTeam) ? 'active' : ''}`}
+                    onClick={() => toggleFavorite(selectedTeam)}
+                    title={isFavorite(selectedTeam) ? "Unfollow team" : "Follow team"}
+                  >
+                    <Star size={18} className={isFavorite(selectedTeam) ? "fill-amber text-amber" : ""} />
+                  </button>
+                )}
               </motion.div>
               
               <motion.div 
@@ -310,35 +308,16 @@ export default function Teams() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ type: "spring", stiffness: 220, damping: 24, delay: 0.22 }}
               >
-                {/* Expandable Team Description */}
+                {/* Peek & Expand Team Description */}
                 {selectedTeam && TEAM_DESCRIPTIONS[selectedTeam] && (
-                  <div className="team-description-container" style={{ marginBottom: "2rem" }}>
-                    <button 
-                      onClick={() => setShowDescription(!showDescription)}
-                      style={{ 
-                        display: "flex", alignItems: "center", gap: "0.5rem", background: "none", border: "none", 
-                        color: "var(--text-primary)", cursor: "pointer", padding: "0.5rem 0", outline: "none",
-                        fontSize: "0.95rem", transition: "opacity 0.2s"
-                      }}
-                    >
-                      <span className="font-semibold" style={{ fontFamily: "inherit" }}>About the {activeTeamInfo?.teamName}</span>
-                      {showDescription ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                    </button>
-                    <AnimatePresence>
-                      {showDescription && (
-                        <motion.div
-                          initial={{ height: 0, opacity: 0 }}
-                          animate={{ height: "auto", opacity: 1 }}
-                          exit={{ height: 0, opacity: 0 }}
-                          transition={{ duration: 0.3, ease: "easeInOut" }}
-                          style={{ overflow: "hidden" }}
-                        >
-                          <p className="text-secondary mt-2 leading-relaxed text-sm" style={{ maxWidth: "800px" }}>
-                            {TEAM_DESCRIPTIONS[selectedTeam]}
-                          </p>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
+                  <div className="team-description-peek-container" style={{ marginBottom: "2rem" }} tabIndex={0}>
+                    <span className="font-semibold team-description-peek-title">About the {activeTeamInfo?.teamName}</span>
+                    <div className="team-description-peek">
+                      <p className="text-secondary leading-relaxed text-sm" style={{ maxWidth: "800px", margin: 0 }}>
+                        {TEAM_DESCRIPTIONS[selectedTeam]}
+                      </p>
+                    </div>
+                    <span className="team-description-peek-label">Hover to read more</span>
                   </div>
                 )}
                 {loading && <div className="mt-8 text-secondary">Loading roster...</div>}

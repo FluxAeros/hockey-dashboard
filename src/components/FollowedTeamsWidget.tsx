@@ -1,9 +1,10 @@
 import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
-import { Star, Flame, Trophy, Calendar, Sparkles, ChevronDown, ChevronUp, MoveHorizontal, LogOut, LogIn } from "lucide-react";
+import { Star, Flame, Trophy, Calendar, Sparkles, ChevronDown, MoveHorizontal, LogOut, LogIn } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { NHL_TEAMS_METADATA } from "../utils/nhlDivisions";
-import { formatLocalDateString } from "../utils/helpers";
+import { formatLocalDateString, isGameActiveLive } from "../utils/helpers";
 import { API_BASE } from "../utils/api";
 import type { StandingItem } from "../types";
 
@@ -189,157 +190,189 @@ export function FollowedTeamsWidget({ onSelectGame, isGameSelected = false }: Fo
               title={isCollapsed ? "Expand Hub" : "Collapse Hub"}
               aria-label={isCollapsed ? "Expand Hub" : "Collapse Hub"}
             >
-              {isCollapsed ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
+              <ChevronDown size={18} className={`followed-hub-chevron ${!isCollapsed ? 'open' : ''}`} />
             </button>
           </div>
         </div>
       </div>
 
-      {!isCollapsed && loading && <div className="p-3 text-xs text-secondary">Updating feed for followed teams...</div>}
+      <AnimatePresence initial={false}>
+        {!isCollapsed && (
+          <motion.div
+            key="followed-hub-content"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.28, ease: [0.4, 0, 0.2, 1] }}
+            style={{ overflow: "hidden" }}
+            className="followed-hub-content"
+          >
+            {loading && <div className="p-3 text-xs text-secondary">Updating feed for followed teams...</div>}
 
-      {!isCollapsed && feedData && (
-        <div className="followed-hub-grid">
-          {/* Upcoming Games Column */}
-          <div className="followed-card">
-            <div className="followed-card-header">
-              <Calendar size={15} />
-              <span>Upcoming Matchups</span>
-            </div>
-            <div className="followed-games-list">
-              {feedData.upcomingGames.length === 0 ? (
-                <div className="text-xs text-secondary p-3">No upcoming games scheduled this week.</div>
-              ) : (
-                feedData.upcomingGames.map((game) => (
-                  <div
-                    key={game.id}
-                    className="followed-game-item"
-                    onClick={() => {
-                      if (onSelectGame) {
-                        onSelectGame(game, game.gameDate);
-                      } else {
-                        navigate("/", { state: { selectedGame: game, selectedDate: game.gameDate } });
-                      }
-                    }}
-                  >
-                    <div className="followed-game-teams">
-                      <div className="followed-team-row">
-                        <img
-                          src={`https://assets.nhle.com/logos/nhl/svg/${game.awayTeam?.abbrev}_light.svg`}
-                          alt={game.awayTeam?.abbrev}
-                          className="followed-game-team-logo"
-                        />
-                        <span className="followed-game-team-abbr">{game.awayTeam?.abbrev}</span>
-                      </div>
-                      <span className="followed-game-at">@</span>
-                      <div className="followed-team-row">
-                        <img
-                          src={`https://assets.nhle.com/logos/nhl/svg/${game.homeTeam?.abbrev}_light.svg`}
-                          alt={game.homeTeam?.abbrev}
-                          className="followed-game-team-logo"
-                        />
-                        <span className="followed-game-team-abbr">{game.homeTeam?.abbrev}</span>
-                      </div>
-                    </div>
-                    <div className="followed-game-meta">
-                      <span className="text-xs text-secondary">{formatLocalDateString(game.gameDate, { month: 'numeric', day: 'numeric' })}</span>
-                      <span className="game-status-tag">{game.gameState === "LIVE" ? "LIVE" : "FUT"}</span>
-                    </div>
+            {feedData && (
+              <div className="followed-hub-grid">
+                {/* Upcoming Games Column */}
+                <div className="followed-card">
+                  <div className="followed-card-header">
+                    <Calendar size={15} />
+                    <span>Upcoming Matchups</span>
                   </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          {/* Recent Results Column */}
-          <div className="followed-card">
-            <div className="followed-card-header">
-              <Flame size={15} />
-              <span>Recent Results</span>
-            </div>
-            <div className="followed-games-list">
-              {feedData.recentGames.length === 0 ? (
-                <div className="text-xs text-secondary p-3">No completed games yet this week.</div>
-              ) : (
-                feedData.recentGames.map((game) => {
-                  const awayFav = favorites.includes(game.awayTeam?.abbrev);
-                  const homeFav = favorites.includes(game.homeTeam?.abbrev);
-                  const homeScore = game.homeTeam?.score ?? 0;
-                  const awayScore = game.awayTeam?.score ?? 0;
-
-                  return (
-                    <div
-                      key={game.id}
-                      className="followed-game-item"
-                      onClick={() => {
-                        if (onSelectGame) {
-                          onSelectGame(game, game.gameDate);
-                        } else {
-                          navigate("/", { state: { selectedGame: game, selectedDate: game.gameDate } });
+                  <div className="followed-games-list">
+                    {feedData.upcomingGames.length === 0 ? (
+                      <div className="text-xs text-secondary p-3">No upcoming games scheduled this week.</div>
+                    ) : (
+                      feedData.upcomingGames.map((game) => {
+                        const isLive = isGameActiveLive(game) || game.gameState === "LIVE" || game.gameState === "CRIT";
+                        let startTime: string | null = null;
+                        if (game.startTimeUTC) {
+                          const d = new Date(game.startTimeUTC);
+                          if (!isNaN(d.getTime())) {
+                            startTime = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+                          }
                         }
-                      }}
-                    >
-                      <div className="followed-game-teams">
-                        <span className={`text-xs ${awayFav ? "font-bold text-accent" : "text-secondary"}`}>
-                          {game.awayTeam?.abbrev} {awayScore}
-                        </span>
-                        <span className="followed-game-hyphen">-</span>
-                        <span className={`text-xs ${homeFav ? "font-bold text-accent" : "text-secondary"}`}>
-                          {game.homeTeam?.abbrev} {homeScore}
-                        </span>
-                      </div>
-                      <div className="followed-game-meta">
-                        <span className="text-xs text-secondary">{formatLocalDateString(game.gameDate, { month: 'numeric', day: 'numeric' })}</span>
-                        <span className="badge-final">FINAL</span>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
 
-          {/* Standings Snapshot */}
-          <div className="followed-card">
-            <div className="followed-card-header">
-              <Trophy size={15} />
-              <span>Standings Snapshot</span>
-            </div>
-            <div className="followed-standings-list">
-              {feedData.standings.length === 0 ? (
-                <div className="text-xs text-secondary p-3">Loading standings...</div>
-              ) : (
-                feedData.standings.map((team) => {
-                  const abbr = team.teamAbbrev?.default || "";
-                  const commonName = team.teamCommonName?.default || abbr;
-                  return (
-                    <div key={abbr} className="followed-standing-row">
-                      <div className="followed-standing-team-info">
-                        <img src={team.teamLogo} alt={abbr} className="followed-standing-logo" />
-                        <div className="followed-standing-names">
-                          <span className="followed-standing-abbr">{abbr}</span>
-                          <span className="followed-standing-fullname">{commonName}</span>
-                        </div>
-                      </div>
-                      <div className="followed-standing-stats">
-                        <span className="standing-record">{team.wins}-{team.losses}-{team.otLosses}</span>
-                        <span className="standing-pts">{team.points} <span className="standing-pts-label">PTS</span></span>
-                        <span className="standing-div">({team.divisionAbbrev})</span>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+                        return (
+                          <div
+                            key={game.id}
+                            className="followed-game-item"
+                            onClick={() => {
+                              if (onSelectGame) {
+                                onSelectGame(game, game.gameDate);
+                              } else {
+                                navigate("/", { state: { selectedGame: game, selectedDate: game.gameDate } });
+                              }
+                            }}
+                          >
+                            <div className="followed-game-teams">
+                              <div className="followed-team-row">
+                                <img
+                                  src={`https://assets.nhle.com/logos/nhl/svg/${game.awayTeam?.abbrev}_light.svg`}
+                                  alt={game.awayTeam?.abbrev}
+                                  className="followed-game-team-logo"
+                                />
+                                <span className="followed-game-team-abbr">{game.awayTeam?.abbrev}</span>
+                              </div>
+                              <span className="followed-game-at">@</span>
+                              <div className="followed-team-row">
+                                <img
+                                  src={`https://assets.nhle.com/logos/nhl/svg/${game.homeTeam?.abbrev}_light.svg`}
+                                  alt={game.homeTeam?.abbrev}
+                                  className="followed-game-team-logo"
+                                />
+                                <span className="followed-game-team-abbr">{game.homeTeam?.abbrev}</span>
+                              </div>
+                            </div>
+                            <div className="followed-game-meta">
+                              <span className="text-xs text-secondary">{formatLocalDateString(game.gameDate, { month: 'numeric', day: 'numeric' })}</span>
+                              {isLive ? (
+                                <span className="badge-live">
+                                  <span className="badge-live-dot" />
+                                  LIVE
+                                </span>
+                              ) : (
+                                startTime && <span className="text-xs text-secondary">{startTime}</span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
 
-      {!isCollapsed && feedData && (
-        <div className="mobile-swipe-indicator">
-          <MoveHorizontal size={14} />
-          <span>Swipe for more</span>
-        </div>
-      )}
+                {/* Recent Results Column */}
+                <div className="followed-card">
+                  <div className="followed-card-header">
+                    <Flame size={15} />
+                    <span>Recent Results</span>
+                  </div>
+                  <div className="followed-games-list">
+                    {feedData.recentGames.length === 0 ? (
+                      <div className="text-xs text-secondary p-3">No completed games yet this week.</div>
+                    ) : (
+                      feedData.recentGames.map((game) => {
+                        const awayFav = favorites.includes(game.awayTeam?.abbrev);
+                        const homeFav = favorites.includes(game.homeTeam?.abbrev);
+                        const homeScore = game.homeTeam?.score ?? 0;
+                        const awayScore = game.awayTeam?.score ?? 0;
+
+                        return (
+                          <div
+                            key={game.id}
+                            className="followed-game-item"
+                            onClick={() => {
+                              if (onSelectGame) {
+                                onSelectGame(game, game.gameDate);
+                              } else {
+                                navigate("/", { state: { selectedGame: game, selectedDate: game.gameDate } });
+                              }
+                            }}
+                          >
+                            <div className="followed-game-teams">
+                              <span className={`text-xs ${awayFav ? "font-bold text-accent" : "text-secondary"}`}>
+                                {game.awayTeam?.abbrev} {awayScore}
+                              </span>
+                              <span className="followed-game-hyphen">-</span>
+                              <span className={`text-xs ${homeFav ? "font-bold text-accent" : "text-secondary"}`}>
+                                {game.homeTeam?.abbrev} {homeScore}
+                              </span>
+                            </div>
+                            <div className="followed-game-meta">
+                              <span className="text-xs text-secondary">{formatLocalDateString(game.gameDate, { month: 'numeric', day: 'numeric' })}</span>
+                              <span className="badge-final">FINAL</span>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+
+                {/* Standings Snapshot */}
+                <div className="followed-card">
+                  <div className="followed-card-header">
+                    <Trophy size={15} />
+                    <span>Standings Snapshot</span>
+                  </div>
+                  <div className="followed-standings-list">
+                    {feedData.standings.length === 0 ? (
+                      <div className="text-xs text-secondary p-3">Loading standings...</div>
+                    ) : (
+                      feedData.standings.map((team) => {
+                        const abbr = team.teamAbbrev?.default || "";
+                        const commonName = team.teamCommonName?.default || abbr;
+                        return (
+                          <div key={abbr} className="followed-standing-row">
+                            <div className="followed-standing-team-info">
+                              <img src={team.teamLogo} alt={abbr} className="followed-standing-logo" />
+                              <div className="followed-standing-names">
+                                <span className="followed-standing-abbr">{abbr}</span>
+                                <span className="followed-standing-fullname">{commonName}</span>
+                              </div>
+                            </div>
+                            <div className="followed-standing-stats">
+                              <span className="standing-record">{team.wins}-{team.losses}-{team.otLosses}</span>
+                              <span className="standing-pts">{team.points} <span className="standing-pts-label">PTS</span></span>
+                              <span className="standing-div">({team.divisionAbbrev})</span>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {feedData && (
+              <div className="mobile-swipe-indicator">
+                <MoveHorizontal size={14} />
+                <span>Swipe for more</span>
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
