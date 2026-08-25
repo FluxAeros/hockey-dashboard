@@ -64,16 +64,47 @@ export default function Dashboard() {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const fetchSchedule = useCallback(async (date: string, keepSelected: boolean = false) => {
+  const [winProbability, setWinProbability] = useState<{ homeProb: number, awayProb: number } | null>(null);
+  const [officialScore, setOfficialScore] = useState<{ homeGoals: number, awayGoals: number, homeShots: number, awayShots: number } | null>(null);
+
+  // Goal celebration state
+  const [goalCelebration, setGoalCelebration] = useState<{ visible: boolean; teamAbbr: string; teamName: string } | null>(null);
+  const prevScoreRef = useRef<{ homeGoals: number; awayGoals: number } | null>(null);
+
+  const stopPolling = useCallback(() => {
+    if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null; }
+    if (countdownRef.current) { clearInterval(countdownRef.current); countdownRef.current = null; }
+    setPollingActive(false);
+  }, []);
+
+  const deselectGame = useCallback(() => {
+    stopPolling();
+    setSelectedGame(null);
+    setShots([]);
+    setHomeTeamId(null);
+    setHomeTeamName("Home");
+    setAwayTeamName("Away");
+    setHomeTeamAbbr("HOME");
+    setAwayTeamAbbr("AWAY");
+    setGameStatus("idle");
+    setStatusMsg("");
+    setWinProbability(null);
+    setOfficialScore(null);
+    setGoalCelebration(null);
+    setMatchups(null);
+    setGamesCollapsed(false);
+    prevScoreRef.current = null;
+  }, [stopPolling]);
+
+  const handleDateChange = useCallback((newDate: string) => {
+    if (newDate === selectedDate) return;
+    deselectGame();
+    setSelectedDate(newDate);
+  }, [selectedDate, deselectGame]);
+
+  const fetchSchedule = useCallback(async (date: string) => {
     setScheduleLoading(true);
     setScheduleError(null);
-    if (!keepSelected) {
-      setScheduleGames([]);
-      setSelectedGame(null);
-      setShots([]);
-      setGameStatus("idle");
-      setStatusMsg("");
-    }
     setScheduleWeek([]);
     setNextStartDate(null);
     try {
@@ -84,30 +115,17 @@ export default function Dashboard() {
       setScheduleGames(games);
       setScheduleWeek(data.gameWeek ?? []);
       setNextStartDate(data.nextStartDate ?? null);
-      if (!games.length && !keepSelected) setScheduleError("No games scheduled for this date.");
+      if (!games.length) setScheduleError("No games scheduled for this date.");
     } catch {
-      if (!keepSelected) setScheduleError("Could not load schedule from NHL API.");
+      setScheduleError("Could not load schedule from NHL API.");
     } finally {
       setScheduleLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchSchedule(selectedDate, selectedGame !== null);
+    fetchSchedule(selectedDate);
   }, [selectedDate, fetchSchedule]);
-
-  const stopPolling = useCallback(() => {
-    if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null; }
-    if (countdownRef.current) { clearInterval(countdownRef.current); countdownRef.current = null; }
-    setPollingActive(false);
-  }, []);
-
-  const [winProbability, setWinProbability] = useState<{ homeProb: number, awayProb: number } | null>(null);
-  const [officialScore, setOfficialScore] = useState<{ homeGoals: number, awayGoals: number, homeShots: number, awayShots: number } | null>(null);
-
-  // Goal celebration state
-  const [goalCelebration, setGoalCelebration] = useState<{ visible: boolean; teamAbbr: string; teamName: string } | null>(null);
-  const prevScoreRef = useRef<{ homeGoals: number; awayGoals: number } | null>(null);
 
   // Preload team logo SVGs to prevent image decode/fetch jank during goal celebration
   useEffect(() => {
@@ -349,7 +367,7 @@ export default function Dashboard() {
       d => d.date > selectedDate && ((d.numberOfGames ?? 0) > 0 || (d.games && d.games.length > 0))
     );
     if (nextInWeek) {
-      setSelectedDate(nextInWeek.date);
+      handleDateChange(nextInWeek.date);
       return;
     }
 
@@ -372,7 +390,7 @@ export default function Dashboard() {
         );
 
         if (firstGameDay) {
-          setSelectedDate(firstGameDay.date);
+          handleDateChange(firstGameDay.date);
           return;
         }
 
@@ -396,15 +414,15 @@ export default function Dashboard() {
         <div className="date-nav-group">
           <button
             className="date-nav-arrow"
-            onClick={() => setSelectedDate(d => shiftDate(d, -1))}
+            onClick={() => handleDateChange(shiftDate(selectedDate, -1))}
             aria-label="Previous day"
           >
             <ChevronLeft size={18} />
           </button>
-          <DatePicker value={selectedDate} onChange={setSelectedDate} />
+          <DatePicker value={selectedDate} onChange={handleDateChange} />
           <button
             className="date-nav-arrow"
-            onClick={() => setSelectedDate(d => shiftDate(d, 1))}
+            onClick={() => handleDateChange(shiftDate(selectedDate, 1))}
             aria-label="Next day"
           >
             <ChevronRight size={18} />

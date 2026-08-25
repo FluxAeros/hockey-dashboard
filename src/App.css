@@ -1890,15 +1890,29 @@
     text-align: center;
   }
 
-  /* Standings & Schedule filters: 4 items → 2×2 grid */
-  .standings-header .conference-filter,
+  /* Standings filters: 4 items → 2×2 grid */
+  .standings-header .conference-filter {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.3rem;
+  }
+
+  .standings-header .conf-filter-btn {
+    flex: unset;
+    white-space: normal;
+    line-height: 1.25;
+    text-align: center;
+    padding: 0.4rem 0.5rem;
+    font-size: 0.75rem;
+  }
+
+  /* Schedule game-type filter: wrap to 2×2 on mobile */
   .schedule-header .conference-filter {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 0.3rem;
   }
 
-  .standings-header .conf-filter-btn,
   .schedule-header .conf-filter-btn {
     flex: unset;
     white-space: normal;
@@ -1906,6 +1920,29 @@
     text-align: center;
     padding: 0.4rem 0.5rem;
     font-size: 0.75rem;
+  }
+
+  /* ---- Conference / Division Picker (mobile) ---- */
+  .cdp-step {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.4rem;
+  }
+
+  .cdp-label {
+    min-width: unset;
+  }
+
+  .cdp-options {
+    width: 100%;
+  }
+
+  .cdp-card-name {
+    font-size: 0.8rem;
+  }
+
+  .cdp-card-sub {
+    font-size: 0.6rem;
   }
 
   /* ---- Team Hero view ---- */
@@ -3202,36 +3239,102 @@
 }
 
 .filter-dropdowns-row {
+  /* kept for backward compat with other pages that may use it */
+  display: none;
+}
+
+/* ---- Conference / Division Two-Step Visual Picker ---- */
+
+.conf-div-picker {
   display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.75rem;
+  flex-direction: column;
+  gap: 0.6rem;
   border-top: 1px solid var(--border-secondary);
   padding-top: 0.65rem;
 }
 
-.filter-dropdown-group {
+.cdp-step {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
-  font-size: 0.8rem;
-  color: var(--text-secondary);
+  gap: 0.75rem;
 }
 
-.filter-select {
-  background-color: var(--bg-primary);
-  color: var(--text-primary);
+.cdp-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  min-width: 5rem;
+}
+
+.cdp-options {
+  display: flex;
+  gap: 0.5rem;
+  flex: 1;
+}
+
+.cdp-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.15rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: 0.6rem;
   border: 1px solid var(--border-primary);
-  border-radius: 0.375rem;
-  padding: 0.35rem 0.65rem;
-  font-size: 0.825rem;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
   cursor: pointer;
-  transition: border-color 0.15s;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+  text-align: center;
 }
 
-.filter-select:focus {
-  outline: none;
+.cdp-card:hover {
   border-color: var(--accent-primary);
+  color: var(--text-primary);
+}
+
+.cdp-card.active {
+  background: rgba(56, 189, 248, 0.12);
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+}
+
+.cdp-card-name {
+  font-size: 0.85rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.cdp-card-sub {
+  font-size: 0.65rem;
+  color: var(--text-tertiary);
+  line-height: 1.2;
+}
+
+.cdp-card.active .cdp-card-sub {
+  color: var(--accent-primary);
+  opacity: 0.7;
+}
+
+/* Division cards are a bit smaller */
+.cdp-card--div {
+  padding: 0.45rem 0.6rem;
+}
+
+.cdp-card--div .cdp-card-name {
+  font-size: 0.8rem;
+}
+
+/* Reset row */
+.filter-reset-row {
+  display: flex;
+  justify-content: flex-end;
+  border-top: 1px solid var(--border-secondary);
+  padding-top: 0.5rem;
 }
 
 .filter-reset-btn {
