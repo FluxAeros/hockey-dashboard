@@ -96,3 +96,50 @@ export interface StandingsResponse {
   standings: StandingItem[];
 }
 
+export interface User {
+  id: number;
+  username: string;
+  email: string;
+  is_admin?: boolean;
+  favorites?: string[];
+  created_at?: string;
+}
+
+export interface FeedbackItem {
+  id: number;
+  user_id?: number | null;
+  username?: string | null;
+  email?: string | null;
+  category: "feature" | "bug" | "general" | "data" | string;
+  rating?: number | null;
+  message: string;
+  status: "new" | "in_review" | "resolved" | "archived" | string;
+  created_at?: string;
+}
+
+export interface AdminAnalyticsSummary {
+  users: {
+    total: number;
+    new_today: number;
+    new_7d: number;
+    active_today: number;
+    active_7d: number;
+  };
+  pageviews: {
+    total: number;
+    today: number;
+    last_7d: number;
+    top_pages: Array<{ path: string; count: number }>;
+    device_breakdown: {
+      desktop: number;
+      mobile: number;
+    };
+  };
+  top_teams: Array<{ team_abbrev: string; count: number }>;
+  feedback: {
+    total: number;
+    new: number;
+    resolved: number;
+    recent: FeedbackItem[];
+  };
+}

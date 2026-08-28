@@ -23,7 +23,14 @@ from db import (
     set_user_favorites,
     toggle_user_favorite,
     get_cached_game,
-    save_cached_game
+    save_cached_game,
+    set_user_admin,
+    get_all_users_admin,
+    log_page_view,
+    create_feedback,
+    get_feedback_list,
+    update_feedback_status,
+    get_admin_analytics_summary
 )
 from cache import cache
 
@@ -181,8 +188,10 @@ def process_game_plays(plays: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return shot_events
 
 
+ADMIN_EMAILS = [e.strip().lower() for e in os.environ.get("ADMIN_EMAILS", "").split(",") if e.strip()]
+
 # ==========================================
-# Auth Schemas & Dependencies
+# Auth & Telemetry Schemas & Dependencies
 # ==========================================
 
 class RegisterRequest(BaseModel):
@@ -199,6 +208,25 @@ class FavoritesRequest(BaseModel):
 
 class ToggleFavoriteRequest(BaseModel):
     team_abbrev: str
+
+class PageViewRequest(BaseModel):
+    path: str
+    referrer: Optional[str] = None
+    session_id: Optional[str] = None
+    device_type: Optional[str] = "desktop"
+
+class FeedbackRequest(BaseModel):
+    category: Optional[str] = "general"
+    rating: Optional[int] = None
+    message: str
+    username: Optional[str] = None
+    email: Optional[str] = None
+
+class UpdateFeedbackStatusRequest(BaseModel):
+    status: str
+
+class ToggleAdminRequest(BaseModel):
+    is_admin: bool
 
 
 async def get_current_user_optional(authorization: Optional[str] = Header(None)) -> Optional[Dict[str, Any]]:
@@ -229,6 +257,12 @@ async def get_current_user(authorization: Optional[str] = Header(None)) -> Dict[
     return user
 
 
+async def require_admin(user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
+    if not user.get("is_admin"):
+        raise HTTPException(status_code=403, detail="Admin authorization required.")
+    return user
+
+
 # ==========================================
 # Auth Endpoints
 # ==========================================
@@ -246,7 +280,8 @@ def register(req: RegisterRequest):
     if existing:
         raise HTTPException(status_code=409, detail="A user with that username or email already exists.")
 
-    user = create_user(req.username, req.email, req.password)
+    is_initial_admin = req.email.strip().lower() in ADMIN_EMAILS
+    user = create_user(req.username, req.email, req.password, is_admin=is_initial_admin)
     token = create_access_token(user.id, user.username)
     return {
         "token": token,
@@ -260,6 +295,9 @@ def login(req: LoginRequest):
     if not user or not verify_password(req.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid username/email or password.")
 
+    if (user.email.lower() in ADMIN_EMAILS or user.username.lower() in ADMIN_EMAILS) and not user.is_admin:
+        user = set_user_admin(user.id, True) or user
+
     token = create_access_token(user.id, user.username)
     return {
         "token": token,
@@ -270,6 +308,106 @@ def login(req: LoginRequest):
 @app.get("/auth/me")
 def get_me(user: Dict[str, Any] = Depends(get_current_user)):
     return {"user": user}
+
+
+# ==========================================
+# Telemetry & Feedback Endpoints (Public)
+# ==========================================
+
+@app.post("/telemetry/pageview")
+async def record_page_view(
+    req: PageViewRequest,
+    current_user: Optional[Dict[str, Any]] = Depends(get_current_user_optional)
+):
+    user_id = current_user["id"] if current_user else None
+    log_page_view(
+        path=req.path,
+        referrer=req.referrer,
+        user_id=user_id,
+        session_id=req.session_id,
+        device_type=req.device_type or "desktop"
+    )
+    return {"status": "ok"}
+
+
+@app.post("/feedback")
+async def submit_feedback(
+    req: FeedbackRequest,
+    current_user: Optional[Dict[str, Any]] = Depends(get_current_user_optional)
+):
+    if not req.message or not req.message.strip():
+        raise HTTPException(status_code=400, detail="Feedback message cannot be empty.")
+
+    user_id = current_user["id"] if current_user else None
+    username = current_user["username"] if current_user else req.username
+    email = current_user["email"] if current_user else req.email
+
+    fb = create_feedback(
+        message=req.message,
+        category=req.category or "general",
+        rating=req.rating,
+        user_id=user_id,
+        username=username,
+        email=email
+    )
+    return {"status": "ok", "feedback": fb}
+
+
+# ==========================================
+# Admin Endpoints (Protected)
+# ==========================================
+
+@app.get("/admin/overview")
+def get_admin_overview(admin: Dict[str, Any] = Depends(require_admin)):
+    summary = get_admin_analytics_summary()
+    return summary
+
+
+@app.get("/admin/users")
+def get_admin_users(
+    search: str = "",
+    limit: int = 100,
+    admin: Dict[str, Any] = Depends(require_admin)
+):
+    users = get_all_users_admin(search=search, limit=limit)
+    return {"users": users}
+
+
+@app.post("/admin/users/{user_id}/toggle-admin")
+def toggle_user_admin_privilege(
+    user_id: int,
+    req: ToggleAdminRequest,
+    admin: Dict[str, Any] = Depends(require_admin)
+):
+    if admin["id"] == user_id and not req.is_admin:
+        raise HTTPException(status_code=400, detail="You cannot revoke your own admin permissions.")
+
+    user = set_user_admin(user_id, req.is_admin)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+    return {"user": user.to_dict()}
+
+
+@app.get("/admin/feedback")
+def get_admin_feedback(
+    status: Optional[str] = None,
+    category: Optional[str] = None,
+    admin: Dict[str, Any] = Depends(require_admin)
+):
+    feedback_list = get_feedback_list(status=status, category=category)
+    return {"feedback": feedback_list}
+
+
+@app.patch("/admin/feedback/{feedback_id}")
+def update_feedback_status_endpoint(
+    feedback_id: int,
+    req: UpdateFeedbackStatusRequest,
+    admin: Dict[str, Any] = Depends(require_admin)
+):
+    updated = update_feedback_status(feedback_id, req.status)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Feedback not found.")
+    return {"feedback": updated}
 
 
 @app.get("/user/favorites")

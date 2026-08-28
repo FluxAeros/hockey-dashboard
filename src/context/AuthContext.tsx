@@ -1,12 +1,8 @@
 import { createContext, useContext, useState, useEffect, type ReactNode, useCallback } from "react";
 import { API_BASE } from "../utils/api";
+import type { User } from "../types";
 
-export interface User {
-  id: number;
-  username: string;
-  email: string;
-  favorites?: string[];
-}
+export type { User };
 
 interface AuthContextType {
   user: User | null;
@@ -15,8 +11,11 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthModalOpen: boolean;
   authModalTab: "login" | "register";
+  isFeedbackModalOpen: boolean;
   openAuthModal: (tab?: "login" | "register") => void;
   closeAuthModal: () => void;
+  openFeedbackModal: () => void;
+  closeFeedbackModal: () => void;
   login: (username_or_email: string, password: string) => Promise<void>;
   register: (username: string, email: string, password: string) => Promise<void>;
   logout: () => void;
@@ -44,6 +43,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const [authModalTab, setAuthModalTab] = useState<"login" | "register">("login");
+  const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState<boolean>(false);
 
   // Fetch current user and favorites on startup if token exists
   const loadUser = useCallback(async (authToken: string) => {
@@ -87,6 +87,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const closeAuthModal = () => {
     setIsAuthModalOpen(false);
+  };
+
+  const openFeedbackModal = () => {
+    setIsFeedbackModalOpen(true);
+  };
+
+  const closeFeedbackModal = () => {
+    setIsFeedbackModalOpen(false);
   };
 
   const login = async (username_or_email: string, password: string) => {
@@ -206,8 +214,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLoading,
         isAuthModalOpen,
         authModalTab,
+        isFeedbackModalOpen,
         openAuthModal,
         closeAuthModal,
+        openFeedbackModal,
+        closeFeedbackModal,
         login,
         register,
         logout,

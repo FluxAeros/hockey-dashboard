@@ -1,7 +1,8 @@
 import { NavLink } from "react-router-dom";
-import { Activity, Calendar, Trophy, Users, LogIn, LogOut, Star } from "lucide-react";
+import { Activity, Calendar, Trophy, Users, LogIn, LogOut, Star, ShieldCheck } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
+import { BetaBadge } from "../components/BetaBadge";
 
 function useMobile() {
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
@@ -14,7 +15,7 @@ function useMobile() {
   return isMobile;
 }
 
-const NAV_LINKS = [
+const BASE_NAV_LINKS = [
   { to: "/", icon: Activity, label: "Live" },
   { to: "/schedule", icon: Calendar, label: "Schedule" },
   { to: "/standings", icon: Trophy, label: "Standings" },
@@ -25,10 +26,14 @@ export function Sidebar() {
   const isMobile = useMobile();
   const { user, favorites, openAuthModal, logout } = useAuth();
 
+  const navLinks = user?.is_admin
+    ? [...BASE_NAV_LINKS, { to: "/admin", icon: ShieldCheck, label: "Admin" }]
+    : BASE_NAV_LINKS;
+
   if (isMobile) {
     return (
       <nav className="bottom-nav">
-        {NAV_LINKS.map(({ to, icon: Icon, label }) => (
+        {navLinks.map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}
             to={to}
@@ -51,10 +56,11 @@ export function Sidebar() {
           alt="Chel Statz"
           className="brand-logo"
         />
+        <BetaBadge />
       </div>
       
       <nav className="sidebar-nav">
-        {NAV_LINKS.map(({ to, icon: Icon, label }) => (
+        {navLinks.map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}
             to={to}
@@ -74,7 +80,10 @@ export function Sidebar() {
               {user.username.charAt(0).toUpperCase()}
             </div>
             <div className="user-info-text">
-              <span className="user-name-label">{user.username}</span>
+              <span className="user-name-label">
+                {user.username}
+                {user.is_admin && <span className="user-admin-indicator">ADM</span>}
+              </span>
               <span className="user-favs-count">
                 <Star size={11} className="fill-amber text-amber" />
                 {favorites.length} followed
