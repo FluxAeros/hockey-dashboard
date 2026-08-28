@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { X, MessageSquare, Bug, Lightbulb, Sparkles, CheckCircle2, Star } from "lucide-react";
+import { X, MessageSquare, Bug, Lightbulb, Sparkles, CheckCircle2, Star, Mail } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { API_BASE } from "../utils/api";
 
@@ -78,16 +78,25 @@ export function FeedbackModal() {
   };
 
   return (
-    <div className="auth-modal-overlay" onClick={handleClose}>
+    <div className="modal-backdrop" onClick={handleClose}>
       <div className="auth-modal feedback-modal" onClick={(e) => e.stopPropagation()}>
-        <button
-          className="auth-modal-close"
-          onClick={handleClose}
-          aria-label="Close modal"
-          type="button"
-        >
-          <X size={18} />
-        </button>
+        <div className="feedback-modal-header">
+          <div>
+            <div className="feedback-badge-pill">Chel Statz Beta</div>
+            <h2 className="feedback-modal-title">Share Your Feedback</h2>
+            <p className="feedback-modal-subtitle">
+              Found a glitch, or have an idea for a killer feature? Let us know!
+            </p>
+          </div>
+          <button
+            className="auth-modal-close feedback-close-btn"
+            onClick={handleClose}
+            aria-label="Close modal"
+            type="button"
+          >
+            <X size={18} />
+          </button>
+        </div>
 
         {isSubmitted ? (
           <div className="feedback-success-state">
@@ -98,88 +107,80 @@ export function FeedbackModal() {
             </p>
           </div>
         ) : (
-          <>
-            <div className="auth-modal-header">
-              <div className="feedback-badge-pill">Chel Statz Beta</div>
-              <h2 className="auth-modal-title">Share Your Feedback</h2>
-              <p className="auth-modal-subtitle">
-                Found a glitch, or have an idea for a killer feature? Let us know!
-              </p>
+          <form onSubmit={handleSubmit} className="auth-form feedback-form">
+            {error && <div className="auth-error-alert">{error}</div>}
+
+            <div className="feedback-category-grid">
+              {CATEGORIES.map(({ id, label, icon: Icon }) => (
+                <button
+                  key={id}
+                  type="button"
+                  className={`feedback-category-chip ${category === id ? "active" : ""}`}
+                  onClick={() => setCategory(id)}
+                >
+                  <Icon size={14} />
+                  <span>{label}</span>
+                </button>
+              ))}
             </div>
 
-            {error && <div className="auth-modal-error">{error}</div>}
+            <div className="auth-input-group">
+              <label htmlFor="feedback-message">
+                What's on your mind? <span style={{ color: "#ef4444" }}>*</span>
+              </label>
+              <textarea
+                id="feedback-message"
+                className="feedback-textarea"
+                rows={4}
+                placeholder="Describe the bug, idea, or overall experience..."
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                required
+              />
+            </div>
 
-            <form onSubmit={handleSubmit} className="auth-form feedback-form">
-              <div className="feedback-category-grid">
-                {CATEGORIES.map(({ id, label, icon: Icon }) => (
+            <div className="auth-input-group">
+              <label>How would you rate the app so far? (optional)</label>
+              <div className="rating-stars-row">
+                {[1, 2, 3, 4, 5].map((star) => (
                   <button
-                    key={id}
+                    key={star}
                     type="button"
-                    className={`feedback-category-chip ${category === id ? "active" : ""}`}
-                    onClick={() => setCategory(id)}
+                    className={`star-btn ${(rating ?? 0) >= star ? "filled" : ""}`}
+                    onClick={() => setRating(rating === star ? null : star)}
                   >
-                    <Icon size={14} />
-                    <span>{label}</span>
+                    <Star size={20} />
                   </button>
                 ))}
               </div>
+            </div>
 
-              <div className="form-group">
-                <label className="form-label" htmlFor="feedback-message">
-                  What's on your mind? <span className="text-accent">*</span>
+            {!user && (
+              <div className="auth-input-group">
+                <label htmlFor="feedback-email">
+                  Your Email (optional - if you'd like a response)
                 </label>
-                <textarea
-                  id="feedback-message"
-                  className="feedback-textarea"
-                  rows={4}
-                  placeholder="Describe the bug, idea, or overall experience..."
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">How would you rate the app so far? (optional)</label>
-                <div className="rating-stars-row">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <button
-                      key={star}
-                      type="button"
-                      className={`star-btn ${(rating ?? 0) >= star ? "filled" : ""}`}
-                      onClick={() => setRating(rating === star ? null : star)}
-                    >
-                      <Star size={20} />
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {!user && (
-                <div className="form-group">
-                  <label className="form-label" htmlFor="feedback-email">
-                    Your Email (optional - if you'd like a response)
-                  </label>
+                <div className="auth-input-wrapper">
+                  <Mail className="auth-input-icon" size={18} />
                   <input
                     id="feedback-email"
                     type="email"
-                    className="form-input"
                     placeholder="you@example.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                   />
                 </div>
-              )}
+              </div>
+            )}
 
-              <button
-                type="submit"
-                className="auth-submit-btn"
-                disabled={isSubmitting || !message.trim()}
-              >
-                {isSubmitting ? "Sending..." : "Submit Feedback"}
-              </button>
-            </form>
-          </>
+            <button
+              type="submit"
+              className="auth-submit-btn"
+              disabled={isSubmitting || !message.trim()}
+            >
+              {isSubmitting ? "Sending..." : "Submit Feedback"}
+            </button>
+          </form>
         )}
       </div>
     </div>

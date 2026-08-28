@@ -2541,7 +2541,8 @@
    Auth Modal & Profile Styles
    ========================================= */
 
-.modal-backdrop {
+.modal-backdrop,
+.auth-modal-overlay {
   position: fixed;
   inset: 0;
   background-color: rgba(15, 23, 42, 0.75);
@@ -3767,6 +3768,34 @@
    ========================================= */
 .feedback-modal {
   max-width: 480px;
+}
+
+.feedback-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 1.25rem 1.25rem 0.85rem 1.25rem;
+  border-bottom: 1px solid var(--border-primary);
+  background-color: rgba(15, 23, 42, 0.4);
+}
+
+.feedback-modal-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-top: 0.15rem;
+  margin-bottom: 0.25rem;
+}
+
+.feedback-modal-subtitle {
+  font-size: 0.825rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.feedback-close-btn {
+  flex-shrink: 0;
+  margin-left: 0.75rem;
 }
 
 .feedback-badge-pill {
