@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import type { NHLGame, Shot, MatchupsResponse, GameStats } from "../types";
-import { todayDateString, shiftDate, formatGameScheduleDateTime, isGameActiveLive } from "../utils/helpers";
+import type { NHLGame, Shot, MatchupsResponse, GameStats, TimeoutsInfo, PowerPlayInfo } from "../types";
+import { todayDateString, shiftDate, formatGameScheduleDateTime, isGameActiveLive, getPeriodClockInfo } from "../utils/helpers";
 import { GameCard } from "../components/GameCard";
 import { HockeyRink } from "../components/HockeyRink";
 import { MatchupBoard } from "../components/MatchupBoard";
@@ -13,8 +13,9 @@ import { NHL_TEAMS_METADATA } from "../utils/nhlDivisions";
 import { TEAM_COLORS } from "../utils/helpers";
 import { GoalCelebration } from "../components/GoalCelebration";
 import { API_BASE } from "../utils/api";
+import { useLiveSync, type GameLivePayload } from "../hooks/useLiveSync";
 
-const REFRESH_INTERVAL = 30000;
+const REFRESH_INTERVAL = 10000;
 
 function resolveTeamFullName(team: any, fallbackAbbr: string): string {
   if (team?.name?.default) return team.name.default;
@@ -60,11 +61,24 @@ export default function Dashboard() {
   const [pollingActive, setPollingActive] = useState<boolean>(false);
   const [gamesCollapsed, setGamesCollapsed] = useState<boolean>(false);
   const [matchups, setMatchups] = useState<MatchupsResponse | null>(null);
+  const [gameClock, setGameClock] = useState<{
+    timeRemaining?: string;
+    secondsRemaining?: number;
+    running?: boolean;
+    inIntermission?: boolean;
+  } | null>(null);
+  const [periodDescriptor, setPeriodDescriptor] = useState<{
+    number?: number;
+    periodType?: string;
+  } | null>(null);
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const [winProbability, setWinProbability] = useState<{ homeProb: number, awayProb: number } | null>(null);
+  const [timeouts, setTimeouts] = useState<TimeoutsInfo | null>(null);
+  const [powerPlay, setPowerPlay] = useState<PowerPlayInfo | null>(null);
+  const [testPenaltyPreview, setTestPenaltyPreview] = useState(false);
   const [officialScore, setOfficialScore] = useState<{ homeGoals: number, awayGoals: number, homeShots: number, awayShots: number } | null>(null);
 
   // Goal celebration state
@@ -92,6 +106,8 @@ export default function Dashboard() {
     setOfficialScore(null);
     setGoalCelebration(null);
     setMatchups(null);
+    setGameClock(null);
+    setPeriodDescriptor(null);
     setGamesCollapsed(false);
     prevScoreRef.current = null;
   }, [stopPolling]);
@@ -140,50 +156,241 @@ export default function Dashboard() {
     });
   }, [selectedGame]);
 
+  const handleScheduleUpdate = useCallback((games: NHLGame[]) => {
+    setScheduleGames(games);
+    if (selectedGame) {
+      const match = games.find(g => g.id === selectedGame.id);
+      if (match) {
+        const liveNow = isGameActiveLive(match, match.gameState);
+        setIsLive(liveNow);
+        if (match.clock) setGameClock(match.clock);
+        if (match.periodDescriptor) setPeriodDescriptor(match.periodDescriptor);
+      }
+    }
+  }, [selectedGame]);
+
+  const handleGameUpdate = useCallback((payload: GameLivePayload) => {
+    if (!selectedGame) return;
+    if (payload.shots && payload.shots.length > 0) {
+      setShots(payload.shots);
+    }
+    if (payload.winProbability !== undefined && payload.winProbability !== null) {
+      setWinProbability(payload.winProbability);
+    }
+    if (payload.timeouts) {
+      setTimeouts(payload.timeouts);
+    }
+    if (payload.powerPlay !== undefined) {
+      setPowerPlay(payload.powerPlay);
+    }
+
+    const box = payload.boxscore;
+    const currentGameState = box?.gameState || payload.gameState || selectedGame.gameState;
+
+    // Update live clock and period descriptor
+    const activeClock = payload.clock || box?.clock;
+    if (activeClock) {
+      setGameClock(activeClock);
+    }
+    const activePdesc = payload.periodDescriptor || box?.periodDescriptor;
+    if (activePdesc) {
+      setPeriodDescriptor(activePdesc);
+    }
+
+    // Keep selectedGame synced with live gameState, clock, and period
+    setSelectedGame(prev => prev ? {
+      ...prev,
+      gameState: currentGameState,
+      clock: activeClock || prev.clock,
+      periodDescriptor: activePdesc || prev.periodDescriptor,
+    } : null);
+
+    if (box?.homeTeam?.id) {
+      setHomeTeamId(box.homeTeam.id);
+    } else if (selectedGame.homeTeam?.id) {
+      setHomeTeamId(selectedGame.homeTeam.id);
+    }
+
+    if (box?.homeTeam && box?.awayTeam) {
+      const newHome = box.homeTeam.score ?? 0;
+      const newAway = box.awayTeam.score ?? 0;
+      const homeAbbr = box.homeTeam.abbrev ?? selectedGame.homeTeam?.abbrev ?? "HOME";
+      const awayAbbr = box.awayTeam.abbrev ?? selectedGame.awayTeam?.abbrev ?? "AWAY";
+      const homeFullName = resolveTeamFullName(box.homeTeam, homeAbbr);
+      const awayFullName = resolveTeamFullName(box.awayTeam, awayAbbr);
+
+      setHomeTeamName(homeFullName);
+      setAwayTeamName(awayFullName);
+      setHomeTeamAbbr(homeAbbr);
+      setAwayTeamAbbr(awayAbbr);
+
+      const prev = prevScoreRef.current;
+      if (prev !== null) {
+        if (newHome > prev.homeGoals) {
+          requestAnimationFrame(() => {
+            setGoalCelebration({ visible: true, teamAbbr: homeAbbr, teamName: homeFullName });
+          });
+        } else if (newAway > prev.awayGoals) {
+          requestAnimationFrame(() => {
+            setGoalCelebration({ visible: true, teamAbbr: awayAbbr, teamName: awayFullName });
+          });
+        }
+      }
+      prevScoreRef.current = { homeGoals: newHome, awayGoals: newAway };
+
+      setOfficialScore({
+        homeGoals: newHome,
+        awayGoals: newAway,
+        homeShots: box.homeTeam.sog ?? 0,
+        awayShots: box.awayTeam.sog ?? 0,
+      });
+
+      // Dynamically update corresponding game card in scheduleGames and selectedGame
+      setSelectedGame(prev => prev ? {
+        ...prev,
+        gameState: currentGameState,
+        clock: activeClock || prev.clock,
+        periodDescriptor: activePdesc || prev.periodDescriptor,
+        awayTeam: { ...prev.awayTeam, score: newAway },
+        homeTeam: { ...prev.homeTeam, score: newHome },
+      } : null);
+
+      setScheduleGames(prevGames => prevGames.map(g => {
+        if (g.id === selectedGame.id) {
+          return {
+            ...g,
+            gameState: currentGameState,
+            clock: activeClock || g.clock,
+            periodDescriptor: activePdesc || g.periodDescriptor,
+            awayTeam: { ...g.awayTeam, score: newAway },
+            homeTeam: { ...g.homeTeam, score: newHome },
+            winProbability: payload.winProbability !== undefined ? payload.winProbability : g.winProbability,
+          };
+        }
+        return g;
+      }));
+    }
+
+    const gameIsLive = isGameActiveLive({ ...selectedGame, gameState: currentGameState }, currentGameState);
+    setIsLive(gameIsLive);
+    setLastUpdated(new Date());
+    setGameStatus("live");
+
+    const shotCount = (payload.shots && payload.shots.length > 0) ? payload.shots.length : shots.length;
+    const info = getPeriodClockInfo(currentGameState, activeClock || gameClock, activePdesc || periodDescriptor, selectedGame.startTimeUTC);
+    if (gameIsLive) {
+      if (info.statusType === "intermission") {
+        setStatusMsg(`${info.primaryText}${info.nextPeriodLabel ? ` · ${info.nextPeriodLabel}` : ""} · ${shotCount} shots (Live)`);
+      } else if (info.timeRemaining) {
+        setStatusMsg(`${info.primaryText} · ${info.timeRemaining} · ${shotCount} shots (Live)`);
+      } else {
+        setStatusMsg(shotCount > 0 ? `${shotCount} shots recorded (Live)` : "Game is live · Waiting for first shot");
+      }
+    } else if (["OVER", "OFF", "FINAL"].includes(currentGameState)) {
+      setStatusMsg(`Final · ${shotCount} shots recorded · Polling paused`);
+    }
+  }, [selectedGame, shots.length, gameClock, periodDescriptor]);
+
+  const { isConnected } = useLiveSync({
+    date: selectedDate,
+    gameId: selectedGame?.id ?? null,
+    onScheduleUpdate: handleScheduleUpdate,
+    onGameUpdate: handleGameUpdate,
+  });
+
+  // Stop HTTP polling whenever WebSocket live sync connects
+  useEffect(() => {
+    if (isConnected) {
+      stopPolling();
+    }
+  }, [isConnected, stopPolling]);
+
+  // Background fallback schedule polling if WebSocket is offline
+  useEffect(() => {
+    if (isConnected) return;
+    const timer = setInterval(() => {
+      fetchSchedule(selectedDate);
+    }, 12000);
+    return () => clearInterval(timer);
+  }, [selectedDate, isConnected, fetchSchedule]);
+
   const fetchGameData = useCallback(async (game: NHLGame): Promise<boolean> => {
     const gid = String(game.id);
     try {
-      const results = await Promise.allSettled([
+      // 1. Fetch live game stats & boxscore concurrently for fast render
+      const [xgRes, boxRes] = await Promise.allSettled([
         fetch(`${API_BASE}/game/${gid}`, { cache: "no-store" }),
-        fetch(`${API_BASE}/boxscore/${gid}`, { cache: "no-store" }),
-        fetch(`${API_BASE}/matchups/${gid}`, { cache: "no-store" })
+        fetch(`${API_BASE}/boxscore/${gid}`, { cache: "no-store" })
       ]);
 
-      const xgRes = results[0].status === "fulfilled" ? results[0].value : null;
-      const boxRes = results[1].status === "fulfilled" ? results[1].value : null;
-      const matchupsRes = results[2].status === "fulfilled" ? results[2].value : null;
+      // 2. Fetch matchups asynchronously in background without blocking win probability
+      fetch(`${API_BASE}/matchups/${gid}`, { cache: "no-store" })
+        .then(res => res.ok ? res.json() : null)
+        .then(matchData => {
+          if (matchData && matchData.team1 && matchData.team2) {
+            setMatchups(matchData);
+          }
+        })
+        .catch(err => console.warn("Failed to load matchups in background", err));
 
       let newShots: Shot[] = [];
-      if (xgRes && xgRes.ok) {
+      if (xgRes.status === "fulfilled" && xgRes.value.ok) {
         try {
-          const xgData = await xgRes.json() as { shots: Shot[], winProbability?: { homeProb: number, awayProb: number } };
+          const xgData = await xgRes.value.json() as {
+            shots: Shot[];
+            winProbability?: { homeProb: number, awayProb: number };
+            timeouts?: TimeoutsInfo;
+            powerPlay?: PowerPlayInfo;
+          };
           newShots = xgData.shots ?? [];
           if (xgData.winProbability) {
             setWinProbability(xgData.winProbability);
           } else {
             setWinProbability(null);
           }
+          if (xgData.timeouts) {
+            setTimeouts(xgData.timeouts);
+          }
+          if (xgData.powerPlay !== undefined) {
+            setPowerPlay(xgData.powerPlay);
+          }
         } catch (e) {
           console.warn("Failed to parse xg data", e);
           setWinProbability(null);
         }
       } else {
-        console.warn(`xG fetch failed with status ${xgRes?.status}`);
+        console.warn("xG fetch failed");
         setWinProbability(null);
       }
       
       let actualHomeId: number | null = game.homeTeam?.id ?? null; 
       let currentGameState = game.gameState;
 
-      if (boxRes && boxRes.ok) {
+      if (boxRes.status === "fulfilled" && boxRes.value.ok) {
         try {
-          const boxData = await boxRes.json() as {
+          const boxData = await boxRes.value.json() as {
             homeTeam?: { id: number, abbrev: string, name?: { default: string }, score?: number, sog?: number };
             awayTeam?: { id: number, abbrev: string, name?: { default: string }, score?: number, sog?: number };
             gameState?: string;
+            clock?: {
+              timeRemaining?: string;
+              secondsRemaining?: number;
+              running?: boolean;
+              inIntermission?: boolean;
+            };
+            periodDescriptor?: {
+              number?: number;
+              periodType?: string;
+            };
           };
           if (boxData.gameState) {
             currentGameState = boxData.gameState;
+          }
+          if (boxData.clock) {
+            setGameClock(boxData.clock);
+          }
+          if (boxData.periodDescriptor) {
+            setPeriodDescriptor(boxData.periodDescriptor);
           }
           if (boxData.homeTeam) {
             actualHomeId = boxData.homeTeam.id ?? actualHomeId;
@@ -224,20 +431,36 @@ export default function Dashboard() {
               homeShots: boxData.homeTeam.sog ?? 0,
               awayShots: boxData.awayTeam.sog ?? 0
             });
+
+            // Dynamically update game card in scheduleGames and selectedGame
+            setSelectedGame(prev => prev && prev.id === game.id ? {
+              ...prev,
+              gameState: currentGameState,
+              clock: boxData.clock || prev.clock,
+              periodDescriptor: boxData.periodDescriptor || prev.periodDescriptor,
+              awayTeam: { ...prev.awayTeam, score: newAway },
+              homeTeam: { ...prev.homeTeam, score: newHome }
+            } : prev);
+
+            setScheduleGames(prevGames => prevGames.map(g => {
+              if (g.id === game.id) {
+                return {
+                  ...g,
+                  gameState: currentGameState,
+                  clock: boxData.clock || g.clock,
+                  periodDescriptor: boxData.periodDescriptor || g.periodDescriptor,
+                  awayTeam: { ...g.awayTeam, score: newAway },
+                  homeTeam: { ...g.homeTeam, score: newHome }
+                };
+              }
+              return g;
+            }));
           }
         } catch (e) {
           console.warn("Failed to parse boxscore data", e);
         }
       } else {
-        // Fallback if boxscore fails
         setHomeTeamId(actualHomeId);
-      }
-
-      if (matchupsRes && matchupsRes.ok) {
-        const matchData = await matchupsRes.json() as MatchupsResponse;
-        if (matchData.team1 && matchData.team2) {
-          setMatchups(matchData);
-        }
       }
 
       if (newShots.length && actualHomeId === null) {
@@ -303,9 +526,15 @@ export default function Dashboard() {
     stopPolling();
     setScheduleError(null);
     setSelectedGame(game);
+    setGameClock(game.clock ?? null);
+    setPeriodDescriptor(game.periodDescriptor ?? null);
+    setWinProbability(game.winProbability ?? null);
+    setTimeouts(null);
+    setPowerPlay(null);
+    setTestPenaltyPreview(false);
     setGamesCollapsed(true);
     setShots([]);
-    setHomeTeamId(null);
+    setHomeTeamId(game.homeTeam?.id ?? null);
     setHomeTeamName(resolveTeamFullName(game.homeTeam, game.homeTeam?.abbrev ?? "Home"));
     setAwayTeamName(resolveTeamFullName(game.awayTeam, game.awayTeam?.abbrev ?? "Away"));
     setHomeTeamAbbr(game.homeTeam?.abbrev ?? "HOME");
@@ -315,10 +544,10 @@ export default function Dashboard() {
     prevScoreRef.current = null;
     setGoalCelebration(null);
     const gameIsLive = await fetchGameData(game);
-    if (gameIsLive) {
+    if (gameIsLive && !isConnected) {
       startPolling(game);
     }
-  }, [fetchGameData, startPolling, stopPolling]);
+  }, [fetchGameData, startPolling, stopPolling, isConnected]);
 
   // Handle incoming game from Schedule page routing
   useEffect(() => {
@@ -492,6 +721,7 @@ export default function Dashboard() {
                 key={game.id}
                 game={game}
                 selected={selectedGame?.id === game.id}
+                winProbability={selectedGame?.id === game.id ? winProbability : game.winProbability}
                 onSelect={handleSelectGame}
               />
             ))}
@@ -509,6 +739,14 @@ export default function Dashboard() {
           homeTeamName={homeTeamName} 
           awayTeamName={awayTeamName} 
           winProbability={winProbability}
+          gameState={selectedGame.gameState}
+          clock={gameClock ?? selectedGame.clock}
+          periodDescriptor={periodDescriptor ?? selectedGame.periodDescriptor}
+          startTimeUTC={selectedGame.startTimeUTC}
+          timeouts={timeouts}
+          powerPlay={powerPlay}
+          testPenaltyPreview={testPenaltyPreview}
+          onDismissTestPenalty={() => setTestPenaltyPreview(false)}
         />
       )}
 
@@ -521,7 +759,12 @@ export default function Dashboard() {
             <span className={gameStatus === "error" ? "text-error" : ""}>{statusMsg}</span>
           </div>
           <div className="status-controls">
-            {pollingActive ? (
+            {isConnected ? (
+              <div className="live-sync-indicator" title="Connected to chelstatz live real-time synchronization engine">
+                <span className="pulse-dot-green" />
+                <span className="live-sync-text">Live Sync</span>
+              </div>
+            ) : pollingActive ? (
               <>
                 <span className="status-text">Refresh in {countdown}s</span>
                 <button className="btn-secondary" onClick={stopPolling}>Pause</button>
@@ -532,7 +775,7 @@ export default function Dashboard() {
                   className="btn-secondary"
                   onClick={async () => {
                     const gameIsLive = await fetchGameData(selectedGame);
-                    if (gameIsLive) {
+                    if (gameIsLive && !isConnected) {
                       startPolling(selectedGame);
                     }
                   }}
@@ -559,7 +802,20 @@ export default function Dashboard() {
                 });
               }}
             >
-              🎯 Test Goal
+              Test Goal
+            </button>
+            <button
+              className="btn-secondary"
+              style={{
+                opacity: testPenaltyPreview ? 1 : 0.6,
+                fontSize: "0.75rem",
+                borderColor: testPenaltyPreview ? "#f59e0b" : undefined,
+                color: testPenaltyPreview ? "#f59e0b" : undefined,
+              }}
+              title="Test the penalty box mugshot widget"
+              onClick={() => setTestPenaltyPreview(prev => !prev)}
+            >
+              {testPenaltyPreview ? "Hide Penalty" : "Test Penalty"}
             </button>
           </div>
         </div>

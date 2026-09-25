@@ -12,6 +12,20 @@ export interface NHLGame {
   startTimeUTC: string;
   awayTeam: TeamInfo;
   homeTeam: TeamInfo;
+  clock?: {
+    timeRemaining?: string;
+    secondsRemaining?: number;
+    running?: boolean;
+    inIntermission?: boolean;
+  };
+  periodDescriptor?: {
+    number?: number;
+    periodType?: string;
+  };
+  winProbability?: {
+    homeProb: number;
+    awayProb: number;
+  } | null;
 }
 
 export interface Shot {
@@ -19,6 +33,8 @@ export interface Shot {
   raw_y: number | null;
   xg: number;
   is_goal: number;
+  is_sog?: number;
+  event_type?: "shot-on-goal" | "missed-shot" | "goal" | string;
   team_id: number | null;
   distance: number | null;
   angle: number | null;
@@ -40,6 +56,33 @@ export interface OpponentMatchup {
   id: number;
   name: string;
   overlap_seconds: number;
+}
+
+export interface PenaltyInfo {
+  playerId: number;
+  playerName: string;
+  sweaterNumber?: number;
+  positionCode?: string;
+  headshot: string;
+  infraction: string;
+  durationMinutes: number;
+  timeRemaining?: string;
+  secondsRemaining?: number;
+}
+
+export interface PowerPlayInfo {
+  hasPowerPlay: boolean;
+  ppTeamAbbr: string;
+  ppTeamId?: number;
+  advantage: string; // e.g. "5-on-4"
+  shortHandedTeamAbbr: string;
+  shortHandedTeamId?: number;
+  penalty?: PenaltyInfo | null;
+}
+
+export interface TimeoutsInfo {
+  homeRemaining: number;
+  awayRemaining: number;
 }
 
 export interface PlayerCardData {
