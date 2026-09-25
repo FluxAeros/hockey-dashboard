@@ -1,14 +1,16 @@
 import os
+import asyncio
 import traceback
+from collections import defaultdict
 from pathlib import Path
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Set
 from contextlib import asynccontextmanager
 
 import httpx
 import numpy as np
 import pandas as pd
 import joblib
-from fastapi import FastAPI, HTTPException, Depends, Header
+from fastapi import FastAPI, HTTPException, Depends, Header, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -64,9 +66,211 @@ def get_http_client() -> httpx.AsyncClient:
     return _http_client
 
 
+_cached_standings_pctg: Dict[str, float] = {}
+
+async def prime_standings_cache():
+    try:
+        await get_standings_now()
+    except Exception:
+        pass
+
+
+class LiveSyncManager:
+    """
+    Coordinates real-time game and schedule subscriptions across connected clients.
+    Broadcasts live updates so all concurrent users see score changes and events simultaneously.
+    """
+    def __init__(self):
+        self.active_connections: Set[WebSocket] = set()
+        self.game_subscribers: Dict[str, Set[WebSocket]] = defaultdict(set)
+        self.date_subscribers: Dict[str, Set[WebSocket]] = defaultdict(set)
+        self.client_subscriptions: Dict[WebSocket, Dict[str, Any]] = {}
+        self.send_locks: Dict[WebSocket, asyncio.Lock] = defaultdict(asyncio.Lock)
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.add(websocket)
+        self.client_subscriptions[websocket] = {"game_id": None, "date": None}
+        self.send_locks[websocket] = asyncio.Lock()
+
+    def disconnect(self, websocket: WebSocket):
+        self.active_connections.discard(websocket)
+        self.send_locks.pop(websocket, None)
+        sub = self.client_subscriptions.pop(websocket, None)
+        if sub:
+            gid = sub.get("game_id")
+            if gid and gid in self.game_subscribers:
+                self.game_subscribers[gid].discard(websocket)
+                if not self.game_subscribers[gid]:
+                    del self.game_subscribers[gid]
+            dt = sub.get("date")
+            if dt and dt in self.date_subscribers:
+                self.date_subscribers[dt].discard(websocket)
+                if not self.date_subscribers[dt]:
+                    del self.date_subscribers[dt]
+
+    async def _safe_send(self, websocket: WebSocket, message: dict):
+        if websocket not in self.active_connections:
+            return
+        lock = self.send_locks.get(websocket)
+        if not lock:
+            return
+        try:
+            async with lock:
+                if websocket in self.active_connections:
+                    await websocket.send_json(message)
+        except Exception:
+            self.disconnect(websocket)
+            try:
+                await websocket.close()
+            except Exception:
+                pass
+
+    async def handle_client_message(self, websocket: WebSocket, data: dict):
+        try:
+            msg_type = data.get("type")
+            if msg_type == "subscribe":
+                new_gid = str(data.get("gameId")) if data.get("gameId") else None
+                new_date = str(data.get("date")) if data.get("date") else None
+                sub = self.client_subscriptions.get(websocket, {})
+                old_gid = sub.get("game_id")
+                old_date = sub.get("date")
+
+                if old_gid and old_gid != new_gid:
+                    self.game_subscribers[old_gid].discard(websocket)
+                if old_date and old_date != new_date:
+                    self.date_subscribers[old_date].discard(websocket)
+
+                if new_gid:
+                    self.game_subscribers[new_gid].add(websocket)
+                if new_date:
+                    self.date_subscribers[new_date].add(websocket)
+
+                self.client_subscriptions[websocket] = {"game_id": new_gid, "date": new_date}
+
+                # Immediate response with current cached schedule data if available
+                if new_date:
+                    cached_schedule = cache.get(f"schedule_{new_date}")
+                    if cached_schedule and "games" in cached_schedule:
+                        await self._safe_send(websocket, {
+                            "type": "schedule_update",
+                            "date": new_date,
+                            "games": cached_schedule.get("games", [])
+                        })
+
+                # For game subscription, only send immediate data if shots are actually present.
+                # Otherwise trigger an async fetch and broadcast so we never push empty shots.
+                if new_gid:
+                    cached_game = cache.get(f"xg_{new_gid}") or get_cached_game(f"xg_{new_gid}")
+                    cached_box = cache.get(f"box_{new_gid}") or get_cached_game(f"box_{new_gid}")
+                    active_clock = (cached_box.get("clock") if cached_box else None) or (cached_game.get("clock") if cached_game else None)
+                    active_pdesc = (cached_box.get("periodDescriptor") if cached_box else None) or (cached_game.get("periodDescriptor") if cached_game else None)
+                    if cached_game and cached_game.get("shots"):
+                        await self._safe_send(websocket, {
+                            "type": "game_update",
+                            "gameId": new_gid,
+                            "data": {
+                                "shots": cached_game.get("shots", []),
+                                "winProbability": cached_game.get("winProbability"),
+                                "gameState": cached_game.get("gameState") or (cached_box.get("gameState") if cached_box else "FUT"),
+                                "clock": active_clock,
+                                "periodDescriptor": active_pdesc,
+                                "boxscore": cached_box or {}
+                            }
+                        })
+                        asyncio.create_task(self._sync_single_game(new_gid))
+                    else:
+                        asyncio.create_task(self._sync_single_game(new_gid))
+            elif msg_type == "ping":
+                await self._safe_send(websocket, {"type": "pong"})
+        except Exception as e:
+            print(f"Error in handle_client_message: {e}")
+
+    async def _sync_single_game(self, game_id: str):
+        try:
+            payload = await fetch_game_live_payload(str(game_id), force_fresh=True)
+            if payload and payload.get("shots"):
+                await self.broadcast_to_game(str(game_id), {
+                    "type": "game_update",
+                    "gameId": str(game_id),
+                    "data": payload
+                })
+        except Exception:
+            pass
+
+    async def broadcast_to_game(self, game_id: str, message: dict):
+        gid = str(game_id)
+        subscribers = list(self.game_subscribers.get(gid, []))
+        if not subscribers:
+            return
+        tasks = [self._safe_send(ws, message) for ws in subscribers]
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+    async def broadcast_to_date(self, date: str, message: dict):
+        dt = str(date)
+        subscribers = list(self.date_subscribers.get(dt, []))
+        if not subscribers:
+            return
+        tasks = [self._safe_send(ws, message) for ws in subscribers]
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+    async def start_sync_loop(self):
+        while True:
+            try:
+                await asyncio.sleep(6)
+                if not self.active_connections:
+                    continue
+
+                # 1. Sync schedule / game cards for active dates
+                dates_to_sync = set(self.date_subscribers.keys())
+                for dt in dates_to_sync:
+                    if not self.date_subscribers[dt]:
+                        continue
+                    try:
+                        sched = await fetch_schedule_with_scores(dt, force_fresh=True)
+                        if sched and "games" in sched:
+                            await self.broadcast_to_date(dt, {
+                                "type": "schedule_update",
+                                "date": dt,
+                                "games": sched.get("games", [])
+                            })
+                    except Exception:
+                        pass
+
+                # 2. Sync watched live games
+                games_to_sync = set(self.game_subscribers.keys())
+                for gid in games_to_sync:
+                    if not self.game_subscribers[gid]:
+                        continue
+                    try:
+                        game_data = await fetch_game_live_payload(gid, force_fresh=True)
+                        if game_data:
+                            await self.broadcast_to_game(gid, {
+                                "type": "game_update",
+                                "gameId": gid,
+                                "data": game_data
+                            })
+                    except Exception:
+                        pass
+            except asyncio.CancelledError:
+                break
+            except Exception:
+                await asyncio.sleep(2)
+
+
+live_sync_manager = LiveSyncManager()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    sync_task = asyncio.create_task(live_sync_manager.start_sync_loop())
+    asyncio.create_task(prime_standings_cache())
     yield
+    sync_task.cancel()
+    try:
+        await sync_task
+    except asyncio.CancelledError:
+        pass
     global _http_client
     if _http_client and not _http_client.is_closed:
         await _http_client.aclose()
@@ -134,7 +338,7 @@ def process_game_plays(plays: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         if period == last_event_period:
             time_since_last_event = current_time_sec - last_event_time
 
-        if event_type in ['shot-on-goal', 'missed-shot', 'goal']:
+        if event_type in ['shot-on-goal', 'goal']:
             current_x = details.get('xCoord')
             current_y = details.get('yCoord')
             
@@ -173,6 +377,8 @@ def process_game_plays(plays: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
                     'is_5v5': is_5v5,
                     'shot_type': shot_type,
                     'is_goal': 1 if event_type == 'goal' else 0,
+                    'is_sog': 1 if event_type in ['shot-on-goal', 'goal'] else 0,
+                    'event_type': event_type,
                     'team_id': current_team,
                     'team_desc': play.get('details', {}).get('typeDescKey', '')
                 })
@@ -485,30 +691,217 @@ def health():
     return {"status": "healthy"}
 
 
-@app.get("/game/{game_id}")
-async def get_live_game_xg(game_id: str):
-    gid = str(game_id)
+def compute_win_probability(
+    processed_shots: List[Dict[str, Any]],
+    plays: List[Dict[str, Any]],
+    home_team_id: Optional[int],
+    away_team_id: Optional[int],
+    home_abbrev: str,
+    away_abbrev: str,
+    game_state: str
+) -> Optional[Dict[str, float]]:
+    try:
+        home_goals = sum(1 for s in processed_shots if s.get('is_goal') == 1 and s.get('team_id') == home_team_id)
+        away_goals = sum(1 for s in processed_shots if s.get('is_goal') == 1 and s.get('team_id') == away_team_id)
+        home_xg = sum(s.get('xg', 0.0) for s in processed_shots if s.get('team_id') == home_team_id)
+        away_xg = sum(s.get('xg', 0.0) for s in processed_shots if s.get('team_id') == away_team_id)
+        home_shots = sum(1 for s in processed_shots if s.get('team_id') == home_team_id)
+        away_shots = sum(1 for s in processed_shots if s.get('team_id') == away_team_id)
 
-    # 1. Check persistent SQLite cache for completed games
-    persistent_cached = get_cached_game(f"xg_{gid}")
-    if persistent_cached and len(persistent_cached.get("shots", [])) > 0:
-        return persistent_cached
+        if game_state in ["FINAL", "OFF"]:
+            if home_goals > away_goals:
+                home_prob = 100.0
+            else:
+                home_prob = 0.0
+            away_prob = round(100.0 - home_prob, 1)
+            return {"homeProb": home_prob, "awayProb": away_prob}
 
-    # 2. Use in-memory cache with request coalescing
-    async def fetch_and_compute_xg():
-        client = get_http_client()
-        url = f"https://api-web.nhle.com/v1/gamecenter/{gid}/play-by-play"
-        res = await client.get(url)
-        if res.status_code != 200:
-            return fix_double_encoding({
-                "shots": [],
-                "winProbability": None,
-                "gameState": "FUT"
-            })
+        if game_state in ["FUT", "PRE"] or not plays:
+            home_pctg = _cached_standings_pctg.get(home_abbrev, 0.5)
+            away_pctg = _cached_standings_pctg.get(away_abbrev, 0.5)
+            logit = 0.14 + (home_pctg - away_pctg) * 3.5
+            home_prob = (1.0 / (1.0 + np.exp(-logit))) * 100
+            home_prob = min(99.5, max(0.5, round(home_prob, 1)))
+            away_prob = round(100.0 - home_prob, 1)
+            return {"homeProb": home_prob, "awayProb": away_prob}
 
-        raw_json = res.json()
-        game_state = raw_json.get("gameState", "FUT")
-        plays = raw_json.get('plays', [])
+        last_play = plays[-1] if plays else {}
+        period = last_play.get('periodDescriptor', {}).get('number', 1)
+        time_in_period = time_to_seconds(last_play.get('timeInPeriod', '00:00'))
+        seconds_elapsed = min(3600, (period - 1) * 1200 + time_in_period)
+        seconds_remaining = max(0, 3600 - seconds_elapsed)
+
+        situation_code = str(last_play.get('situationCode', '1551'))
+        away_skaters = int(situation_code[1]) if len(situation_code) == 4 else 5
+        home_skaters = int(situation_code[2]) if len(situation_code) == 4 else 5
+        manpower_diff = home_skaters - away_skaters
+
+        score_diff = home_goals - away_goals
+        xg_diff = home_xg - away_xg
+        shots_diff = home_shots - away_shots
+
+        if win_prob_model:
+            features_df = pd.DataFrame([{
+                'score_diff': score_diff,
+                'seconds_remaining': seconds_remaining,
+                'period': min(period, 3),
+                'manpower_diff': manpower_diff,
+                'xg_diff': xg_diff,
+                'shots_diff': shots_diff
+            }])
+            home_prob = float(win_prob_model.predict_proba(features_df)[0][1]) * 100
+        else:
+            logit = 0.14 + (score_diff * 1.35) + (xg_diff * 0.55) + (shots_diff * 0.05)
+            home_prob = (1.0 / (1.0 + np.exp(-logit))) * 100
+
+        home_prob = min(99.5, max(0.5, round(home_prob, 1)))
+        away_prob = round(100.0 - home_prob, 1)
+        return {"homeProb": home_prob, "awayProb": away_prob}
+    except Exception:
+        return None
+
+
+def estimate_game_win_prob(
+    game: Dict[str, Any],
+    home_abbrev: str,
+    away_abbrev: str
+) -> Optional[Dict[str, float]]:
+    try:
+        state = (game.get("gameState") or "").upper()
+        home_score = (game.get("homeTeam", {}) or {}).get("score", 0)
+        away_score = (game.get("awayTeam", {}) or {}).get("score", 0)
+        if home_score is None:
+            home_score = 0
+        if away_score is None:
+            away_score = 0
+
+        if state in ["FINAL", "OFF", "OVER"]:
+            if home_score > away_score:
+                return {"homeProb": 100.0, "awayProb": 0.0}
+            elif away_score > home_score:
+                return {"homeProb": 0.0, "awayProb": 100.0}
+            return {"homeProb": 50.0, "awayProb": 50.0}
+
+        if state in ["FUT", "PRE"]:
+            home_pctg = _cached_standings_pctg.get(home_abbrev, 0.5)
+            away_pctg = _cached_standings_pctg.get(away_abbrev, 0.5)
+            logit = 0.14 + (home_pctg - away_pctg) * 3.5
+            home_prob = (1.0 / (1.0 + np.exp(-logit))) * 100
+            home_prob = min(99.5, max(0.5, round(home_prob, 1)))
+            return {"homeProb": home_prob, "awayProb": round(100.0 - home_prob, 1)}
+
+        if state in ["LIVE", "CRIT"]:
+            home_sog = (game.get("homeTeam", {}) or {}).get("sog")
+            away_sog = (game.get("awayTeam", {}) or {}).get("sog")
+            if home_sog is None:
+                home_sog = home_score * 5
+            if away_sog is None:
+                away_sog = away_score * 5
+
+            pdesc = game.get("periodDescriptor", {}) or {}
+            period = pdesc.get("number", 1) or 1
+            clock = game.get("clock", {}) or {}
+            sec_rem = clock.get("secondsRemaining")
+            if sec_rem is None:
+                time_rem = clock.get("timeRemaining", "20:00")
+                sec_rem = time_to_seconds(time_rem) if time_rem else 1200
+
+            seconds_elapsed = min(3600, (period - 1) * 1200 + max(0, 1200 - sec_rem))
+            seconds_remaining = max(0, 3600 - seconds_elapsed)
+
+            score_diff = home_score - away_score
+            shots_diff = home_sog - away_sog
+            xg_diff = shots_diff * 0.075
+
+            if win_prob_model:
+                try:
+                    features_df = pd.DataFrame([{
+                        'score_diff': score_diff,
+                        'seconds_remaining': seconds_remaining,
+                        'period': min(period, 3),
+                        'manpower_diff': 0,
+                        'xg_diff': xg_diff,
+                        'shots_diff': shots_diff
+                    }])
+                    home_prob = float(win_prob_model.predict_proba(features_df)[0][1]) * 100
+                except Exception:
+                    logit = 0.14 + (score_diff * 1.35) + (xg_diff * 0.55) + (shots_diff * 0.05)
+                    home_prob = (1.0 / (1.0 + np.exp(-logit))) * 100
+            else:
+                logit = 0.14 + (score_diff * 1.35) + (xg_diff * 0.55) + (shots_diff * 0.05)
+                home_prob = (1.0 / (1.0 + np.exp(-logit))) * 100
+
+            home_prob = min(99.5, max(0.5, round(home_prob, 1)))
+            return {"homeProb": home_prob, "awayProb": round(100.0 - home_prob, 1)}
+
+        return None
+    except Exception:
+        return None
+
+
+async def fetch_game_live_payload(gid: str, force_fresh: bool = False) -> Dict[str, Any]:
+    pbp_key = f"xg_{gid}"
+    box_key = f"box_{gid}"
+
+    if not force_fresh:
+        # Check SQLite for finished game
+        persistent_pbp = get_cached_game(pbp_key)
+        persistent_box = get_cached_game(box_key)
+        if persistent_pbp and len(persistent_pbp.get("shots", [])) > 0:
+            return {
+                "shots": persistent_pbp.get("shots", []),
+                "winProbability": persistent_pbp.get("winProbability"),
+                "gameState": persistent_pbp.get("gameState", "FINAL"),
+                "clock": persistent_box.get("clock") if persistent_box else None,
+                "periodDescriptor": persistent_box.get("periodDescriptor") if persistent_box else None,
+                "timeouts": persistent_pbp.get("timeouts", {"homeRemaining": 1, "awayRemaining": 1}),
+                "powerPlay": persistent_pbp.get("powerPlay") or {"hasPowerPlay": False, "advantage": "5-on-5", "ppTeamAbbr": "", "shortHandedTeamAbbr": ""},
+                "boxscore": persistent_box or {}
+            }
+
+        cached_pbp = cache.get(pbp_key)
+        cached_box = cache.get(box_key)
+        if cached_pbp and cached_box:
+            return {
+                "shots": cached_pbp.get("shots", []),
+                "winProbability": cached_pbp.get("winProbability"),
+                "gameState": cached_pbp.get("gameState", "FUT"),
+                "clock": cached_box.get("clock"),
+                "periodDescriptor": cached_box.get("periodDescriptor"),
+                "timeouts": cached_pbp.get("timeouts", {"homeRemaining": 1, "awayRemaining": 1}),
+                "powerPlay": cached_pbp.get("powerPlay") or {"hasPowerPlay": False, "advantage": "5-on-5", "ppTeamAbbr": "", "shortHandedTeamAbbr": ""},
+                "boxscore": cached_box
+            }
+
+    client = get_http_client()
+    pbp_url = f"https://api-web.nhle.com/v1/gamecenter/{gid}/play-by-play"
+    box_url = f"https://api-web.nhle.com/v1/gamecenter/{gid}/boxscore"
+
+    pbp_res, box_res = await asyncio.gather(
+        client.get(pbp_url),
+        client.get(box_url),
+        return_exceptions=True
+    )
+
+    box_data = {}
+    game_state = "FUT"
+    if not isinstance(box_res, Exception) and box_res.status_code == 200:
+        box_data = fix_double_encoding(box_res.json())
+        game_state = box_data.get("gameState", "FUT")
+        ttl = 8 if game_state in ["LIVE", "CRIT"] else 60
+        cache.set(box_key, box_data, ttl=ttl)
+        if game_state in ["FINAL", "OFF"] and (box_data.get("boxscore") or box_data.get("playerByGameStats")):
+            save_cached_game(box_key, game_state, box_data)
+
+    processed_shots = []
+    win_prob = None
+    timeouts_data = {"homeRemaining": 1, "awayRemaining": 1}
+    power_play_data = {"hasPowerPlay": False, "advantage": "5-on-5", "ppTeamAbbr": "", "shortHandedTeamAbbr": ""}
+
+    if not isinstance(pbp_res, Exception) and pbp_res.status_code == 200:
+        pbp_data = pbp_res.json()
+        game_state = pbp_data.get("gameState", game_state)
+        plays = pbp_data.get('plays', [])
         processed_shots = process_game_plays(plays)
 
         if processed_shots and model:
@@ -526,122 +919,303 @@ async def get_live_game_xg(game_id: str):
             for idx, prob in enumerate(probabilities):
                 processed_shots[idx]['xg'] = float(prob)
 
-        # Win probability calculation
-        win_probability = None
-        try:
-            home_team_id = raw_json.get('homeTeam', {}).get('id')
-            away_team_id = raw_json.get('awayTeam', {}).get('id')
-            
-            home_goals = sum(1 for s in processed_shots if s.get('is_goal') == 1 and s.get('team_id') == home_team_id)
-            away_goals = sum(1 for s in processed_shots if s.get('is_goal') == 1 and s.get('team_id') == away_team_id)
-            home_xg = sum(s.get('xg', 0.0) for s in processed_shots if s.get('team_id') == home_team_id)
-            away_xg = sum(s.get('xg', 0.0) for s in processed_shots if s.get('team_id') == away_team_id)
-            home_shots = sum(1 for s in processed_shots if s.get('team_id') == home_team_id)
-            away_shots = sum(1 for s in processed_shots if s.get('team_id') == away_team_id)
-            
-            last_play = plays[-1] if plays else {}
-            period = last_play.get('periodDescriptor', {}).get('number', 1)
-            time_in_period = time_to_seconds(last_play.get('timeInPeriod', '00:00'))
-            seconds_elapsed = min(3600, (period - 1) * 1200 + time_in_period)
-            seconds_remaining = max(0, 3600 - seconds_elapsed)
-            
-            situation_code = str(last_play.get('situationCode', '1551'))
-            away_skaters = int(situation_code[1]) if len(situation_code) == 4 else 5
-            home_skaters = int(situation_code[2]) if len(situation_code) == 4 else 5
-            manpower_diff = home_skaters - away_skaters
-            
-            score_diff = home_goals - away_goals
-            xg_diff = home_xg - away_xg
-            shots_diff = home_shots - away_shots
-            
-            
-            if game_state in ["FINAL", "OFF"]:
-                if home_goals > away_goals:
-                    home_prob = 100.0
-                else:
-                    home_prob = 0.0
-                away_prob = round(100.0 - home_prob, 1)
-                win_probability = {"homeProb": home_prob, "awayProb": away_prob}
-            elif game_state in ["FUT", "PRE"] or not plays:
-                try:
-                    standings_data = await get_standings_now()
-                    standings_list = standings_data.get("standings", [])
-                    home_abbrev = raw_json.get('homeTeam', {}).get('abbrev', '')
-                    away_abbrev = raw_json.get('awayTeam', {}).get('abbrev', '')
-                    
-                    home_pctg = 0.5
-                    away_pctg = 0.5
-                    for t in standings_list:
-                        if t.get("teamAbbrev", {}).get("default") == home_abbrev:
-                            home_pctg = t.get("pointPctg", 0.5)
-                        if t.get("teamAbbrev", {}).get("default") == away_abbrev:
-                            away_pctg = t.get("pointPctg", 0.5)
-                            
-                    logit = 0.14 + (home_pctg - away_pctg) * 3.5
-                    home_prob = (1.0 / (1.0 + np.exp(-logit))) * 100
-                    home_prob = min(99.5, max(0.5, round(home_prob, 1)))
-                    away_prob = round(100.0 - home_prob, 1)
-                    win_probability = {"homeProb": home_prob, "awayProb": away_prob}
-                except Exception:
-                    win_probability = None
-            else:
-                if win_prob_model:
-                    features_input = np.array([[score_diff, seconds_remaining, min(period, 3), manpower_diff, xg_diff, shots_diff]])
-                    home_prob = float(win_prob_model.predict_proba(features_input)[0][1]) * 100
-                else:
-                    logit = 0.14 + (score_diff * 1.35) + (xg_diff * 0.55) + (shots_diff * 0.05)
-                    home_prob = (1.0 / (1.0 + np.exp(-logit))) * 100
-                    
-                home_prob = min(99.5, max(0.5, round(home_prob, 1)))
-                away_prob = round(100.0 - home_prob, 1)
-                win_probability = {"homeProb": home_prob, "awayProb": away_prob}
-        except Exception:
-            pass
+        home_id = pbp_data.get("homeTeam", {}).get("id") or box_data.get("homeTeam", {}).get("id")
+        away_id = pbp_data.get("awayTeam", {}).get("id") or box_data.get("awayTeam", {}).get("id")
+        home_abbr = pbp_data.get("homeTeam", {}).get("abbrev", "") or box_data.get("homeTeam", {}).get("abbrev", "")
+        away_abbr = pbp_data.get("awayTeam", {}).get("abbrev", "") or box_data.get("awayTeam", {}).get("abbrev", "")
 
-        result = fix_double_encoding({
+        win_prob = compute_win_probability(
+            processed_shots=processed_shots,
+            plays=plays,
+            home_team_id=home_id,
+            away_team_id=away_id,
+            home_abbrev=home_abbr,
+            away_abbrev=away_abbr,
+            game_state=game_state
+        )
+
+        pbp_clock = pbp_data.get("clock")
+        pbp_period = pbp_data.get("periodDescriptor")
+        clock = box_data.get("clock") or pbp_clock
+        period_descriptor = box_data.get("periodDescriptor") or pbp_period
+
+        # Parse timeouts
+        home_timeout_used = False
+        away_timeout_used = False
+        for p in plays:
+            if p.get("typeDescKey") == "stoppage":
+                det = p.get("details", {})
+                r1 = str(det.get("reason", "")).lower()
+                r2 = str(det.get("secondaryReason", "")).lower()
+                if "home-timeout" in r1 or "home-timeout" in r2:
+                    home_timeout_used = True
+                elif "visitor-timeout" in r1 or "visitor-timeout" in r2 or "away-timeout" in r1:
+                    away_timeout_used = True
+
+        timeouts_data = {
+            "homeRemaining": 0 if home_timeout_used else 1,
+            "awayRemaining": 0 if away_timeout_used else 1
+        }
+
+        # Parse roster map for player details & headshots
+        roster_map = {}
+        for r in pbp_data.get("rosterSpots", []):
+            pid = r.get("playerId")
+            if pid:
+                fn = r.get("firstName", {}).get("default", "") if isinstance(r.get("firstName"), dict) else str(r.get("firstName", ""))
+                ln = r.get("lastName", {}).get("default", "") if isinstance(r.get("lastName"), dict) else str(r.get("lastName", ""))
+                name = f"{fn} {ln}".strip()
+                headshot = r.get("headshot") or f"https://assets.nhle.com/mugs/nhl/latest/{pid}.png"
+                roster_map[pid] = {
+                    "name": name,
+                    "sweaterNumber": r.get("sweaterNumber"),
+                    "positionCode": r.get("positionCode"),
+                    "headshot": headshot
+                }
+
+        # Parse manpower & active power play / penalty
+        last_play = plays[-1] if plays else {}
+        sit_code = str(last_play.get("situationCode", "1551"))
+        away_skaters = int(sit_code[1]) if len(sit_code) == 4 and sit_code[1].isdigit() else 5
+        home_skaters = int(sit_code[2]) if len(sit_code) == 4 and sit_code[2].isdigit() else 5
+
+        has_pp = False
+        pp_abbr = ""
+        pp_id = None
+        sh_abbr = ""
+        sh_id = None
+        advantage = "5-on-5"
+
+        if home_skaters > away_skaters:
+            has_pp = True
+            pp_abbr = home_abbr
+            pp_id = home_id
+            sh_abbr = away_abbr
+            sh_id = away_id
+            advantage = f"{home_skaters}-on-{away_skaters}"
+        elif away_skaters > home_skaters:
+            has_pp = True
+            pp_abbr = away_abbr
+            pp_id = away_id
+            sh_abbr = home_abbr
+            sh_id = home_id
+            advantage = f"{away_skaters}-on-{home_skaters}"
+
+        active_penalty = None
+        if has_pp:
+            for p in reversed(plays):
+                if p.get("typeDescKey") == "penalty":
+                    det = p.get("details", {})
+                    event_team = det.get("eventOwnerTeamId")
+                    if event_team == sh_id or not event_team:
+                        pid = det.get("committedByPlayerId") or det.get("servedByPlayerId")
+                        desc_k = det.get("descKey", "minor-penalty")
+                        infraction = desc_k.replace("-", " ").title()
+                        duration = det.get("duration", 2)
+
+                        pen_period = p.get("periodDescriptor", {}).get("number", 1)
+                        pen_time_sec = time_to_seconds(p.get("timeInPeriod", "00:00"))
+                        curr_period = period_descriptor.get("number", 1) if period_descriptor else pen_period
+                        curr_time_sec = 0
+                        if clock and clock.get("timeRemaining"):
+                            rem_sec = clock.get("secondsRemaining")
+                            if rem_sec is None:
+                                rem_sec = time_to_seconds(clock.get("timeRemaining", "20:00"))
+                            curr_time_sec = 1200 - rem_sec
+
+                        elapsed_penalty = 0
+                        if curr_period == pen_period:
+                            elapsed_penalty = max(0, curr_time_sec - pen_time_sec)
+                        elif curr_period > pen_period:
+                            elapsed_penalty = (1200 - pen_time_sec) + curr_time_sec
+
+                        penalty_total_sec = duration * 60
+                        penalty_rem_sec = max(0, penalty_total_sec - elapsed_penalty)
+                        m = penalty_rem_sec // 60
+                        s = penalty_rem_sec % 60
+                        time_rem_str = f"{m:02d}:{s:02d}"
+
+                        player_info = roster_map.get(pid, {})
+                        active_penalty = {
+                            "playerId": pid,
+                            "playerName": player_info.get("name", "Penalized Player"),
+                            "sweaterNumber": player_info.get("sweaterNumber"),
+                            "positionCode": player_info.get("positionCode"),
+                            "headshot": player_info.get("headshot", f"https://assets.nhle.com/mugs/nhl/latest/{pid}.png"),
+                            "infraction": infraction,
+                            "durationMinutes": duration,
+                            "timeRemaining": time_rem_str,
+                            "secondsRemaining": penalty_rem_sec
+                        }
+                        break
+
+        power_play_data = {
+            "hasPowerPlay": has_pp,
+            "ppTeamAbbr": pp_abbr,
+            "ppTeamId": pp_id,
+            "advantage": advantage,
+            "shortHandedTeamAbbr": sh_abbr,
+            "shortHandedTeamId": sh_id,
+            "penalty": active_penalty
+        }
+
+        pbp_result = fix_double_encoding({
             "shots": processed_shots,
-            "winProbability": win_probability,
-            "gameState": game_state
+            "winProbability": win_prob,
+            "gameState": game_state,
+            "clock": clock,
+            "periodDescriptor": period_descriptor,
+            "timeouts": timeouts_data,
+            "powerPlay": power_play_data
         })
 
+        ttl = 8 if game_state in ["LIVE", "CRIT"] else 60
+        cache.set(pbp_key, pbp_result, ttl=ttl)
+
         if game_state in ["FINAL", "OFF"] and len(processed_shots) > 0:
-            save_cached_game(f"xg_{gid}", game_state, result)
+            save_cached_game(pbp_key, game_state, pbp_result)
+    else:
+        clock = box_data.get("clock")
+        period_descriptor = box_data.get("periodDescriptor")
 
-        return result
+    return {
+        "shots": processed_shots,
+        "winProbability": win_prob,
+        "gameState": game_state,
+        "clock": clock,
+        "periodDescriptor": period_descriptor,
+        "timeouts": timeouts_data,
+        "powerPlay": power_play_data,
+        "boxscore": box_data
+    }
 
-    return await cache.get_or_set(f"xg_{gid}", fetch_and_compute_xg, ttl=15)
+
+async def fetch_schedule_with_scores(date: str, force_fresh: bool = False) -> Dict[str, Any]:
+    cache_key = f"schedule_{date}"
+    if not force_fresh:
+        cached = cache.get(cache_key)
+        if cached:
+            return cached
+
+    client = get_http_client()
+    sched_url = f"https://api-web.nhle.com/v1/schedule/{date}"
+    score_url = f"https://api-web.nhle.com/v1/score/{date}"
+
+    sched_res, score_res = await asyncio.gather(
+        client.get(sched_url),
+        client.get(score_url),
+        return_exceptions=True
+    )
+
+    if isinstance(sched_res, Exception) or sched_res.status_code != 200:
+        return {"games": [], "gameWeek": [], "nextStartDate": None, "previousStartDate": None}
+
+    sched_data = sched_res.json()
+    game_week = sched_data.get("gameWeek", [])
+    day = next((d for d in game_week if d.get("date") == date), None)
+    games = day.get("games", []) if day else []
+
+    score_games = {}
+    if not isinstance(score_res, Exception) and score_res.status_code == 200:
+        for sg in score_res.json().get("games", []):
+            score_games[sg.get("id")] = sg
+
+    any_active = False
+    for g in games:
+        gid = g.get("id")
+        sg = score_games.get(gid)
+        if sg:
+            if sg.get("gameState"):
+                g["gameState"] = sg["gameState"]
+            if "awayTeam" in sg and "score" in sg["awayTeam"]:
+                g.setdefault("awayTeam", {})["score"] = sg["awayTeam"]["score"]
+            if "homeTeam" in sg and "score" in sg["homeTeam"]:
+                g.setdefault("homeTeam", {})["score"] = sg["homeTeam"]["score"]
+            if "awayTeam" in sg and "sog" in sg["awayTeam"]:
+                g.setdefault("awayTeam", {})["sog"] = sg["awayTeam"]["sog"]
+            if "homeTeam" in sg and "sog" in sg["homeTeam"]:
+                g.setdefault("homeTeam", {})["sog"] = sg["homeTeam"]["sog"]
+            if "clock" in sg:
+                g["clock"] = sg["clock"]
+            if "periodDescriptor" in sg:
+                g["periodDescriptor"] = sg["periodDescriptor"]
+
+        state = (g.get("gameState") or "").upper()
+        if state in ["LIVE", "CRIT", "PRE"]:
+            any_active = True
+
+        pbp_key = f"xg_{gid}"
+        cached_pbp = cache.get(pbp_key) or get_cached_game(pbp_key)
+        if cached_pbp and cached_pbp.get("winProbability"):
+            g["winProbability"] = cached_pbp["winProbability"]
+        else:
+            home_abbr = g.get("homeTeam", {}).get("abbrev", "")
+            away_abbr = g.get("awayTeam", {}).get("abbrev", "")
+            g["winProbability"] = estimate_game_win_prob(g, home_abbr, away_abbr)
+
+    result = fix_double_encoding({
+        "games": games,
+        "gameWeek": game_week,
+        "nextStartDate": sched_data.get("nextStartDate"),
+        "previousStartDate": sched_data.get("previousStartDate")
+    })
+
+    ttl = 8 if any_active else 120
+    cache.set(cache_key, result, ttl=ttl)
+    return result
+
+
+@app.websocket("/ws/live")
+async def websocket_live_endpoint(websocket: WebSocket):
+    await live_sync_manager.connect(websocket)
+    try:
+        while True:
+            data = await websocket.receive_json()
+            await live_sync_manager.handle_client_message(websocket, data)
+    except (WebSocketDisconnect, Exception):
+        live_sync_manager.disconnect(websocket)
+
+
+@app.get("/game/{game_id}")
+async def get_live_game_xg(game_id: str):
+    gid = str(game_id)
+    persistent_cached = get_cached_game(f"xg_{gid}")
+    if persistent_cached and len(persistent_cached.get("shots", [])) > 0:
+        return persistent_cached
+
+    cached = cache.get(f"xg_{gid}")
+    if cached:
+        return cached
+
+    payload = await fetch_game_live_payload(gid)
+    res = {
+        "shots": payload["shots"],
+        "winProbability": payload["winProbability"],
+        "gameState": payload["gameState"],
+        "timeouts": payload.get("timeouts"),
+        "powerPlay": payload.get("powerPlay")
+    }
+    await live_sync_manager.broadcast_to_game(gid, {
+        "type": "game_update",
+        "gameId": gid,
+        "data": payload
+    })
+    return res
 
 
 @app.get("/game/{game_id}/win-prob")
 async def get_game_win_prob(game_id: str):
+    gid = str(game_id)
+    cached = cache.get(f"xg_{gid}")
+    if cached and cached.get("winProbability") is not None:
+        return cached["winProbability"]
     data = await get_live_game_xg(game_id)
     return data.get("winProbability", {})
 
 
 @app.get("/schedule/{date}")
 async def get_schedule(date: str):
-    async def fetch_schedule():
-        client = get_http_client()
-        url = f"https://api-web.nhle.com/v1/schedule/{date}"
-        res = await client.get(url)
-        if res.status_code != 200:
-            return fix_double_encoding({
-                "games": [],
-                "gameWeek": [],
-                "nextStartDate": None,
-                "previousStartDate": None
-            })
-        data = res.json()
-        game_week = data.get('gameWeek', [])
-        day = next((d for d in game_week if d.get('date') == date), None)
-        return fix_double_encoding({
-            "games": day.get('games', []) if day else [],
-            "gameWeek": game_week,
-            "nextStartDate": data.get("nextStartDate"),
-            "previousStartDate": data.get("previousStartDate")
-        })
-
-    return await cache.get_or_set(f"schedule_{date}", fetch_schedule, ttl=120)
+    return await fetch_schedule_with_scores(date)
 
 
 @app.get("/schedule-week/now")
@@ -660,24 +1234,16 @@ async def get_schedule_week():
 @app.get("/boxscore/{game_id}")
 async def get_boxscore(game_id: str):
     gid = str(game_id)
-
     persistent_cached = get_cached_game(f"box_{gid}")
     if persistent_cached and (persistent_cached.get("boxscore") or persistent_cached.get("playerByGameStats")):
         return persistent_cached
 
-    async def fetch_boxscore():
-        client = get_http_client()
-        url = f"https://api-web.nhle.com/v1/gamecenter/{gid}/boxscore"
-        res = await client.get(url)
-        if res.status_code != 200:
-            raise HTTPException(status_code=404, detail="Boxscore not found.")
-        data = fix_double_encoding(res.json())
-        game_state = data.get("gameState")
-        if game_state in ["FINAL", "OFF"] and (data.get("boxscore") or data.get("playerByGameStats")):
-            save_cached_game(f"box_{gid}", game_state, data)
-        return data
+    cached = cache.get(f"box_{gid}")
+    if cached:
+        return cached
 
-    return await cache.get_or_set(f"box_{gid}", fetch_boxscore, ttl=15)
+    payload = await fetch_game_live_payload(gid)
+    return payload.get("boxscore", {})
 
 
 @app.get("/matchups/{game_id}")
@@ -848,7 +1414,12 @@ async def get_standings_now():
             if res.status_code == 429:
                 raise HTTPException(status_code=429, detail="NHL API rate limit exceeded.")
             raise HTTPException(status_code=404, detail="Standings not found.")
-        return fix_double_encoding(res.json())
+        data = fix_double_encoding(res.json())
+        for s in data.get("standings", []):
+            abbr = s.get("teamAbbrev", {}).get("default")
+            if abbr:
+                _cached_standings_pctg[abbr] = s.get("pointPctg", 0.5)
+        return data
 
     return await cache.get_or_set("standings_now", fetch_standings, ttl=300)
 

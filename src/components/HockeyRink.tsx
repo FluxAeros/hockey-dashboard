@@ -16,9 +16,10 @@ export function HockeyRink({ shots, homeTeamId, homeAbbr, awayAbbr }: HockeyRink
   const homeColor = TEAM_COLORS[homeAbbr] || "#378ADD";
   const awayColor = TEAM_COLORS[awayAbbr] || "#97C459";
 
-  // Filter shots for the default view
+  // Filter shots for the default view: do NOT filter danger shots until 20 shots recorded
   let displayedShots = shots;
-  if (!isExpanded && shots.length > 0) {
+  const isFiltered = !isExpanded && shots.length >= 20;
+  if (isFiltered) {
     const goals = shots.filter(s => s.is_goal === 1);
     const nonGoals = shots.filter(s => s.is_goal !== 1).sort((a, b) => (b.xg ?? 0) - (a.xg ?? 0));
     const topNonGoals = nonGoals.slice(0, Math.ceil(nonGoals.length * 0.3));
@@ -126,6 +127,16 @@ export function HockeyRink({ shots, homeTeamId, homeAbbr, awayAbbr }: HockeyRink
         title={!isExpanded ? "Click to expand shot map" : undefined}
       >
         {rinkSvg}
+
+        <div className="hockey-rink-shot-counter">
+          {shots.length < 20 ? (
+            <span>Showing all {shots.length} shots on goal (matches scoreboard)</span>
+          ) : (
+            <span>
+              Showing {displayedShots.length} high-danger shots ({shots.length} total shots on goal · <span className="rink-expand-hint">click to expand</span>)
+            </span>
+          )}
+        </div>
       </div>
 
       {isExpanded && (
@@ -135,7 +146,7 @@ export function HockeyRink({ shots, homeTeamId, homeAbbr, awayAbbr }: HockeyRink
               &times;
             </button>
             <h3 style={{ margin: "0 0 16px 0", color: "var(--color-text)", textAlign: "center" }}>
-              All Shots ({shots.length})
+              All Shots on Goal ({shots.length})
             </h3>
             <div className="hockey-rink-modal-svg-wrapper">
               {rinkSvg}

@@ -172,3 +172,157 @@ export function formatTOI(seconds: number): string {
   const s = String(seconds % 60).padStart(2, "0");
   return `${m}:${s}`;
 }
+
+export interface PeriodClockInfo {
+  statusType: "intermission" | "live" | "period_end" | "final" | "pre";
+  primaryText: string;             // e.g. "1st Intermission", "1st Period", "Final"
+  shortText: string;               // e.g. "1st Int", "P1", "Final"
+  timeRemaining?: string;          // e.g. "02:04", "14:22"
+  nextPeriodStartEstimate?: string;// e.g. "5:59 PM"
+  nextPeriodLabel?: string;        // e.g. "2nd Period starts at ~5:59 PM"
+  nextPeriodName?: string;         // e.g. "2nd Period"
+  isRunning?: boolean;
+  periodNumber?: number;
+  badgeText: string;               // e.g. "1st Int · P2 ~5:59 PM" or "P1 · 14:22"
+}
+
+export function getPeriodClockInfo(
+  gameState?: string,
+  clock?: {
+    timeRemaining?: string;
+    secondsRemaining?: number;
+    running?: boolean;
+    inIntermission?: boolean;
+  } | null,
+  periodDescriptor?: {
+    number?: number;
+    periodType?: string;
+  } | null,
+  startTimeUTC?: string
+): PeriodClockInfo {
+  const state = (gameState || "").toUpperCase();
+  const isFinal = ["FINAL", "OFF", "OVER"].includes(state);
+  const isLive = state === "LIVE" || state === "CRIT";
+
+  if (isFinal) {
+    const periodNum = periodDescriptor?.number ?? 3;
+    let label = "Final";
+    if (periodNum === 4 || periodDescriptor?.periodType === "OT") label = "Final / OT";
+    else if (periodNum > 4 || periodDescriptor?.periodType === "SO") label = "Final / SO";
+    return {
+      statusType: "final",
+      primaryText: label,
+      shortText: label,
+      badgeText: label,
+    };
+  }
+
+  if (!isLive) {
+    let startStr = "";
+    if (startTimeUTC) {
+      startStr = new Date(startTimeUTC).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    }
+    const label = startStr ? `Starts ${startStr}` : "Scheduled";
+    return {
+      statusType: "pre",
+      primaryText: label,
+      shortText: startStr || "Pre",
+      badgeText: startStr || "Scheduled",
+      nextPeriodStartEstimate: startStr || undefined,
+    };
+  }
+
+  const periodNum = periodDescriptor?.number ?? 1;
+  const getOrdinalPeriod = (n: number) => {
+    if (n === 1) return "1st";
+    if (n === 2) return "2nd";
+    if (n === 3) return "3rd";
+    if (n === 4) return "OT";
+    if (n === 5) return "SO";
+    return `P${n}`;
+  };
+
+  const currentOrdinal = getOrdinalPeriod(periodNum);
+  const nextPeriodNum = periodNum + 1;
+  const nextOrdinal = getOrdinalPeriod(nextPeriodNum);
+  const nextPeriodName = nextPeriodNum <= 3 ? `${nextOrdinal} Period` : (nextPeriodNum === 4 ? "Overtime" : "Shootout");
+  const nextPeriodShort = nextPeriodNum > 3 ? (nextPeriodNum === 4 ? "OT" : "SO") : `P${nextPeriodNum}`;
+
+  // 1. Intermission Check
+  if (clock?.inIntermission) {
+    let nextStartStr: string | undefined;
+    let nextLabel: string | undefined;
+
+    if (clock.secondsRemaining != null && clock.secondsRemaining >= 0) {
+      const estDate = new Date(Date.now() + clock.secondsRemaining * 1000);
+      nextStartStr = estDate.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+      nextLabel = `${nextPeriodName} starts at ~${nextStartStr}`;
+    } else if (clock.timeRemaining) {
+      const parts = clock.timeRemaining.split(":");
+      if (parts.length === 2) {
+        const sec = parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+        if (!isNaN(sec) && sec >= 0) {
+          const estDate = new Date(Date.now() + sec * 1000);
+          nextStartStr = estDate.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+          nextLabel = `${nextPeriodName} starts at ~${nextStartStr}`;
+        }
+      }
+    }
+
+    if (!nextLabel) {
+      nextLabel = `${nextPeriodName} starts soon`;
+    }
+
+    const badgeText = nextStartStr 
+      ? `Int · ${nextPeriodShort} ~${nextStartStr}`
+      : `${currentOrdinal} Int${clock.timeRemaining ? ` (${clock.timeRemaining})` : ""}`;
+
+    return {
+      statusType: "intermission",
+      primaryText: `${currentOrdinal} Intermission`,
+      shortText: `${currentOrdinal} Int`,
+      timeRemaining: clock.timeRemaining || undefined,
+      nextPeriodStartEstimate: nextStartStr,
+      nextPeriodLabel: nextLabel,
+      nextPeriodName,
+      isRunning: false,
+      periodNumber: periodNum,
+      badgeText,
+    };
+  }
+
+  // 2. Period End (00:00) before intermission flag is set
+  const timeRem = clock?.timeRemaining ?? "";
+  if (timeRem === "00:00") {
+    const estDate = new Date(Date.now() + 18 * 60 * 1000);
+    const nextStartStr = estDate.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    return {
+      statusType: "period_end",
+      primaryText: `End of ${currentOrdinal}`,
+      shortText: `End ${currentOrdinal}`,
+      timeRemaining: "00:00",
+      nextPeriodStartEstimate: nextStartStr,
+      nextPeriodLabel: `${nextPeriodName} starts at ~${nextStartStr}`,
+      nextPeriodName,
+      isRunning: false,
+      periodNumber: periodNum,
+      badgeText: `End ${currentOrdinal} · ${nextPeriodShort} ~${nextStartStr}`,
+    };
+  }
+
+  // 3. Live Active Period
+  const periodLabel = periodNum <= 3 ? `${currentOrdinal} Period` : (periodNum === 4 ? "Overtime" : "Shootout");
+  const shortLabel = periodNum > 3 ? (periodNum === 4 ? "OT" : "SO") : `P${periodNum}`;
+  const badgeText = timeRem ? `${shortLabel} · ${timeRem}` : periodLabel;
+
+  return {
+    statusType: "live",
+    primaryText: periodLabel,
+    shortText: shortLabel,
+    timeRemaining: timeRem || undefined,
+    isRunning: clock?.running ?? true,
+    periodNumber: periodNum,
+    badgeText,
+  };
+}
+

@@ -12,7 +12,7 @@ export function BetaBadge() {
       type="button"
     >
       <Sparkles size={12} className="beta-badge-icon" />
-      <span>v0.9.0-beta</span>
+      <span>v0.9.1-beta</span>
     </button>
   );
 }
