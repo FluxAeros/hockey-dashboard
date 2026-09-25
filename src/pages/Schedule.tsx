@@ -43,41 +43,58 @@ export default function Schedule() {
 
   const navDirectionRef = useRef<"forward" | "backward">("forward");
 
+  const scheduleReqIdRef = useRef<number>(0);
+
   const fetchSchedule = useCallback(async (dateStr: string) => {
+    const reqId = ++scheduleReqIdRef.current;
     setLoading(true);
     setError(null);
-    try {
-      const res = await fetch(`${API_BASE}/schedule/${dateStr}`);
-      if (!res.ok) throw new Error("Failed to load schedule");
-      const data = await res.json();
-      
-      const week: GameDay[] = data.gameWeek || [];
-      const nextStart = data.nextStartDate || null;
-      const prevStart = data.previousStartDate || null;
 
-      setNextStartDate(nextStart);
-      setPreviousStartDate(prevStart);
+    const maxAttempts = 4;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        const res = await fetch(`${API_BASE}/schedule/${dateStr}`);
+        if (!res.ok) throw new Error("Failed to load schedule");
+        const data = await res.json();
+        if (reqId !== scheduleReqIdRef.current) return;
+        
+        const week: GameDay[] = data.gameWeek || [];
+        const nextStart = data.nextStartDate || null;
+        const prevStart = data.previousStartDate || null;
 
-      const totalGamesInWeek = week.reduce(
-        (sum, d) => sum + (d.numberOfGames || (d.games ? d.games.length : 0)), 
-        0
-      );
+        setNextStartDate(nextStart);
+        setPreviousStartDate(prevStart);
 
-      if (totalGamesInWeek === 0) {
-        if (navDirectionRef.current === "backward" && prevStart && prevStart < dateStr) {
-          setCurrentDate(prevStart);
-          return;
-        } else if (nextStart && nextStart > dateStr) {
-          setCurrentDate(nextStart);
-          return;
+        const totalGamesInWeek = week.reduce(
+          (sum, d) => sum + (d.numberOfGames || (d.games ? d.games.length : 0)), 
+          0
+        );
+
+        if (totalGamesInWeek === 0) {
+          if (navDirectionRef.current === "backward" && prevStart && prevStart < dateStr) {
+            setCurrentDate(prevStart);
+            setLoading(false);
+            return;
+          } else if (nextStart && nextStart > dateStr) {
+            setCurrentDate(nextStart);
+            setLoading(false);
+            return;
+          }
+        }
+
+        setScheduleWeek(week);
+        setLoading(false);
+        return;
+      } catch {
+        if (reqId !== scheduleReqIdRef.current) return;
+        if (attempt < maxAttempts - 1) {
+          const delayMs = 700 * (attempt + 1);
+          await new Promise(resolve => setTimeout(resolve, delayMs));
+        } else {
+          setError("Could not load schedule from NHL API.");
+          setLoading(false);
         }
       }
-
-      setScheduleWeek(week);
-    } catch {
-      setError("Could not load schedule from NHL API.");
-    } finally {
-      setLoading(false);
     }
   }, []);
 

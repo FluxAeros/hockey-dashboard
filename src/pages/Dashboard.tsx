@@ -118,24 +118,44 @@ export default function Dashboard() {
     setSelectedDate(newDate);
   }, [selectedDate, deselectGame]);
 
+  const scheduleReqIdRef = useRef<number>(0);
+
   const fetchSchedule = useCallback(async (date: string) => {
+    const reqId = ++scheduleReqIdRef.current;
     setScheduleLoading(true);
     setScheduleError(null);
     setScheduleWeek([]);
     setNextStartDate(null);
-    try {
-      const res = await fetch(`${API_BASE}/schedule/${date}`);
-      if (!res.ok) throw new Error(`Schedule fetch failed (${res.status})`);
-      const data = await res.json() as { games: NHLGame[], gameWeek: any[], nextStartDate?: string };
-      const games = data.games ?? [];
-      setScheduleGames(games);
-      setScheduleWeek(data.gameWeek ?? []);
-      setNextStartDate(data.nextStartDate ?? null);
-      if (!games.length) setScheduleError("No games scheduled for this date.");
-    } catch {
-      setScheduleError("Could not load schedule from NHL API.");
-    } finally {
-      setScheduleLoading(false);
+
+    const maxAttempts = 4;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        const res = await fetch(`${API_BASE}/schedule/${date}`);
+        if (!res.ok) throw new Error(`Schedule fetch failed (${res.status})`);
+        const data = await res.json() as { games: NHLGame[], gameWeek: any[], nextStartDate?: string };
+        if (reqId !== scheduleReqIdRef.current) return;
+
+        const games = data.games ?? [];
+        setScheduleGames(games);
+        setScheduleWeek(data.gameWeek ?? []);
+        setNextStartDate(data.nextStartDate ?? null);
+        if (!games.length) {
+          setScheduleError("No games scheduled for this date.");
+        } else {
+          setScheduleError(null);
+        }
+        setScheduleLoading(false);
+        return;
+      } catch {
+        if (reqId !== scheduleReqIdRef.current) return;
+        if (attempt < maxAttempts - 1) {
+          const delayMs = 700 * (attempt + 1);
+          await new Promise(resolve => setTimeout(resolve, delayMs));
+        } else {
+          setScheduleError("Could not load schedule from NHL API.");
+          setScheduleLoading(false);
+        }
+      }
     }
   }, []);
 
@@ -158,6 +178,10 @@ export default function Dashboard() {
 
   const handleScheduleUpdate = useCallback((games: NHLGame[]) => {
     setScheduleGames(games);
+    if (games.length > 0) {
+      setScheduleError(null);
+      setScheduleLoading(false);
+    }
     if (selectedGame) {
       const match = games.find(g => g.id === selectedGame.id);
       if (match) {
@@ -298,21 +322,25 @@ export default function Dashboard() {
     onGameUpdate: handleGameUpdate,
   });
 
-  // Stop HTTP polling whenever WebSocket live sync connects
+  // Stop HTTP polling whenever WebSocket live sync connects, and recover schedule if initial load failed
   useEffect(() => {
     if (isConnected) {
       stopPolling();
+      if (scheduleError === "Could not load schedule from NHL API.") {
+        fetchSchedule(selectedDate);
+      }
     }
-  }, [isConnected, stopPolling]);
+  }, [isConnected, stopPolling, scheduleError, selectedDate, fetchSchedule]);
 
-  // Background fallback schedule polling if WebSocket is offline
+  // Background fallback schedule polling if WebSocket is offline or if schedule failed to load
   useEffect(() => {
-    if (isConnected) return;
+    const hasApiError = scheduleError === "Could not load schedule from NHL API.";
+    if (isConnected && !hasApiError) return;
     const timer = setInterval(() => {
       fetchSchedule(selectedDate);
-    }, 12000);
+    }, hasApiError ? 5000 : 12000);
     return () => clearInterval(timer);
-  }, [selectedDate, isConnected, fetchSchedule]);
+  }, [selectedDate, isConnected, scheduleError, fetchSchedule]);
 
   const fetchGameData = useCallback(async (game: NHLGame): Promise<boolean> => {
     const gid = String(game.id);

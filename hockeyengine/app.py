@@ -52,10 +52,21 @@ def fix_double_encoding(data):
 
 _http_client: Optional[httpx.AsyncClient] = None
 
-def get_http_client() -> httpx.AsyncClient:
+def get_http_client(force_new: bool = False) -> httpx.AsyncClient:
     global _http_client
+    if force_new and _http_client is not None and not _http_client.is_closed:
+        try:
+            asyncio.create_task(_http_client.aclose())
+        except Exception:
+            pass
+        _http_client = None
+
     if _http_client is None or _http_client.is_closed:
-        limits = httpx.Limits(max_keepalive_connections=20, max_connections=50)
+        limits = httpx.Limits(
+            max_keepalive_connections=20,
+            max_connections=50,
+            keepalive_expiry=15.0
+        )
         timeout = httpx.Timeout(10.0, connect=5.0)
         _http_client = httpx.AsyncClient(
             limits=limits,
@@ -64,6 +75,27 @@ def get_http_client() -> httpx.AsyncClient:
             follow_redirects=True
         )
     return _http_client
+
+
+async def nhl_get(url: str, retries: int = 3) -> httpx.Response:
+    """Perform GET request to NHL API with automatic retry on stale keep-alive sockets or transient 5xx/429 errors."""
+    last_exc: Optional[Exception] = None
+    for attempt in range(retries):
+        client = get_http_client(force_new=(attempt > 0 and last_exc is not None))
+        try:
+            res = await client.get(url)
+            if res.status_code in (429, 500, 502, 503, 504) and attempt < retries - 1:
+                last_exc = None
+                await asyncio.sleep(0.4 * (attempt + 1))
+                continue
+            return res
+        except Exception as exc:
+            last_exc = exc
+            if attempt < retries - 1:
+                await asyncio.sleep(0.35 * (attempt + 1))
+            else:
+                raise
+    raise last_exc or RuntimeError(f"Failed to fetch {url}")
 
 
 _cached_standings_pctg: Dict[str, float] = {}
@@ -148,7 +180,7 @@ class LiveSyncManager:
 
                 self.client_subscriptions[websocket] = {"game_id": new_gid, "date": new_date}
 
-                # Immediate response with current cached schedule data if available
+                # Immediate response with current cached schedule data if available, otherwise sync in background
                 if new_date:
                     cached_schedule = cache.get(f"schedule_{new_date}")
                     if cached_schedule and "games" in cached_schedule:
@@ -157,6 +189,8 @@ class LiveSyncManager:
                             "date": new_date,
                             "games": cached_schedule.get("games", [])
                         })
+                    else:
+                        asyncio.create_task(self._sync_single_date(new_date))
 
                 # For game subscription, only send immediate data if shots are actually present.
                 # Otherwise trigger an async fetch and broadcast so we never push empty shots.
@@ -185,6 +219,18 @@ class LiveSyncManager:
                 await self._safe_send(websocket, {"type": "pong"})
         except Exception as e:
             print(f"Error in handle_client_message: {e}")
+
+    async def _sync_single_date(self, date: str):
+        try:
+            sched = await fetch_schedule_with_scores(str(date), force_fresh=False)
+            if sched and "games" in sched:
+                await self.broadcast_to_date(str(date), {
+                    "type": "schedule_update",
+                    "date": str(date),
+                    "games": sched.get("games", [])
+                })
+        except Exception:
+            pass
 
     async def _sync_single_game(self, game_id: str):
         try:
@@ -873,13 +919,12 @@ async def fetch_game_live_payload(gid: str, force_fresh: bool = False) -> Dict[s
                 "boxscore": cached_box
             }
 
-    client = get_http_client()
     pbp_url = f"https://api-web.nhle.com/v1/gamecenter/{gid}/play-by-play"
     box_url = f"https://api-web.nhle.com/v1/gamecenter/{gid}/boxscore"
 
     pbp_res, box_res = await asyncio.gather(
-        client.get(pbp_url),
-        client.get(box_url),
+        nhl_get(pbp_url),
+        nhl_get(box_url),
         return_exceptions=True
     )
 
@@ -1090,35 +1135,44 @@ async def fetch_game_live_payload(gid: str, force_fresh: bool = False) -> Dict[s
     }
 
 
-async def fetch_schedule_with_scores(date: str, force_fresh: bool = False) -> Dict[str, Any]:
+async def _do_fetch_schedule_with_scores(date: str) -> Dict[str, Any]:
     cache_key = f"schedule_{date}"
-    if not force_fresh:
-        cached = cache.get(cache_key)
-        if cached:
-            return cached
-
-    client = get_http_client()
     sched_url = f"https://api-web.nhle.com/v1/schedule/{date}"
     score_url = f"https://api-web.nhle.com/v1/score/{date}"
 
     sched_res, score_res = await asyncio.gather(
-        client.get(sched_url),
-        client.get(score_url),
+        nhl_get(sched_url),
+        nhl_get(score_url),
         return_exceptions=True
     )
 
-    if isinstance(sched_res, Exception) or sched_res.status_code != 200:
-        return {"games": [], "gameWeek": [], "nextStartDate": None, "previousStartDate": None}
+    sched_data = None
+    if not isinstance(sched_res, Exception) and sched_res.status_code == 200:
+        try:
+            sched_data = sched_res.json()
+        except Exception:
+            sched_data = None
 
-    sched_data = sched_res.json()
+    # Fallback: if schedule/{date} failed, check if schedule_now cache already has this date
+    if not sched_data:
+        cached_week = cache.get("schedule_now")
+        if cached_week and any(d.get("date") == date for d in cached_week.get("gameWeek", [])):
+            sched_data = cached_week
+
+    if not sched_data:
+        raise HTTPException(status_code=503, detail="Could not load schedule from NHL API.")
+
     game_week = sched_data.get("gameWeek", [])
     day = next((d for d in game_week if d.get("date") == date), None)
     games = day.get("games", []) if day else []
 
     score_games = {}
     if not isinstance(score_res, Exception) and score_res.status_code == 200:
-        for sg in score_res.json().get("games", []):
-            score_games[sg.get("id")] = sg
+        try:
+            for sg in score_res.json().get("games", []):
+                score_games[sg.get("id")] = sg
+        except Exception:
+            pass
 
     any_active = False
     for g in games:
@@ -1163,6 +1217,22 @@ async def fetch_schedule_with_scores(date: str, force_fresh: bool = False) -> Di
     ttl = 8 if any_active else 120
     cache.set(cache_key, result, ttl=ttl)
     return result
+
+
+async def fetch_schedule_with_scores(date: str, force_fresh: bool = False) -> Dict[str, Any]:
+    cache_key = f"schedule_{date}"
+    if not force_fresh:
+        cached = cache.get(cache_key)
+        if cached:
+            return cached
+        key_lock = cache._get_lock(cache_key)
+        async with key_lock:
+            cached = cache.get(cache_key)
+            if cached:
+                return cached
+            return await _do_fetch_schedule_with_scores(date)
+
+    return await _do_fetch_schedule_with_scores(date)
 
 
 @app.websocket("/ws/live")
@@ -1221,9 +1291,8 @@ async def get_schedule(date: str):
 @app.get("/schedule-week/now")
 async def get_schedule_week():
     async def fetch_week():
-        client = get_http_client()
         url = "https://api-web.nhle.com/v1/schedule/now"
-        res = await client.get(url)
+        res = await nhl_get(url)
         if res.status_code != 200:
             raise HTTPException(status_code=res.status_code, detail="Schedule not found.")
         return fix_double_encoding(res.json())
@@ -1376,9 +1445,8 @@ async def get_matchups(game_id: str):
 async def get_roster(team_abbr: str):
     abbr = team_abbr.upper()
     async def fetch_roster():
-        client = get_http_client()
         url = f"https://api-web.nhle.com/v1/roster/{abbr}/current"
-        res = await client.get(url)
+        res = await nhl_get(url)
         if res.status_code != 200:
             if res.status_code == 429:
                 raise HTTPException(status_code=429, detail="NHL API rate limit exceeded.")
@@ -1392,9 +1460,8 @@ async def get_roster(team_abbr: str):
 async def get_player(player_id: str):
     pid = str(player_id)
     async def fetch_player():
-        client = get_http_client()
         url = f"https://api-web.nhle.com/v1/player/{pid}/landing"
-        res = await client.get(url)
+        res = await nhl_get(url)
         if res.status_code != 200:
             if res.status_code == 429:
                 raise HTTPException(status_code=429, detail="NHL API rate limit exceeded.")
@@ -1407,9 +1474,8 @@ async def get_player(player_id: str):
 @app.get("/standings/now")
 async def get_standings_now():
     async def fetch_standings():
-        client = get_http_client()
         url = "https://api-web.nhle.com/v1/standings/now"
-        res = await client.get(url)
+        res = await nhl_get(url)
         if res.status_code != 200:
             if res.status_code == 429:
                 raise HTTPException(status_code=429, detail="NHL API rate limit exceeded.")
@@ -1427,9 +1493,8 @@ async def get_standings_now():
 @app.get("/standings/{date}")
 async def get_standings_date(date: str):
     async def fetch_standings_date():
-        client = get_http_client()
         url = f"https://api-web.nhle.com/v1/standings/{date}"
-        res = await client.get(url)
+        res = await nhl_get(url)
         if res.status_code != 200:
             if res.status_code == 429:
                 raise HTTPException(status_code=429, detail="NHL API rate limit exceeded.")
