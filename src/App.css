@@ -8017,3 +8017,194 @@
     display: none !important;
   }
 }
+
+
+/* =========================================
+   Closed iPhone Duo & Final Layout Polish
+   ========================================= */
+
+/* Put horizontal overflow clipping on main-viewport instead of html/body so iOS position:fixed bottom-nav never detaches */
+.main-viewport {
+  overflow-x: clip;
+}
+
+/* Truly sticky, flush frosted-ice bottom nav on iOS PWA / Closed iPhone Duo */
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 999;
+  transform: translate3d(0, 0, 0);
+  -webkit-transform: translate3d(0, 0, 0);
+  background-color: rgba(235, 242, 249, 0.96);
+  padding: 0.35rem max(0.5rem, env(safe-area-inset-right)) max(0.35rem, env(safe-area-inset-bottom)) max(0.5rem, env(safe-area-inset-left));
+}
+
+.bottom-nav-link {
+  min-height: 42px;
+  padding: 0.25rem 0.4rem;
+}
+
+/* Status bar controls wrap cleanly on closed Duo (no Test Goal / Test Penalty overflow) */
+.status-controls {
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+@media (max-width: 767px) {
+  .status-controls {
+    justify-content: flex-start;
+  }
+
+  .status-controls .btn-secondary {
+    padding: 0.35rem 0.65rem;
+    font-size: 0.74rem;
+  }
+}
+
+/* Prevent Game Card header time / status / game-type overlap on narrow tiles */
+.game-card-header {
+  flex-wrap: wrap;
+  row-gap: 0.25rem;
+  align-items: center;
+}
+
+@media (max-width: 520px) {
+  .game-card {
+    padding: 0.75rem 0.7rem;
+  }
+
+  .game-card-header {
+    gap: 0.25rem;
+  }
+
+  .game-card-status {
+    gap: 0.3rem;
+    font-size: 0.66rem;
+  }
+
+  .game-type-tag {
+    font-size: 0.6rem;
+    padding: 0.1rem 0.3rem;
+  }
+
+  .game-card-corner-time {
+    font-size: 0.62rem;
+    padding: 0.1rem 0.34rem;
+  }
+
+  .game-card-teams {
+    font-size: 0.9rem;
+  }
+
+  .game-card-team-logo {
+    width: 20px;
+    height: 20px;
+    min-width: 20px;
+  }
+}
+
+/* Center Forwards / Defensemen / Goalies selector on Team Roster page */
+.roster-tabs {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Followed Teams Hub: all 3 side-by-side when wide (>= 1080px), else 1-at-a-time swipe carousel */
+@media (min-width: 1080px) {
+  .followed-hub-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1rem;
+  }
+
+  .mobile-swipe-indicator {
+    display: none;
+  }
+}
+
+@media (max-width: 1079px) {
+  .followed-hub-grid {
+    display: flex !important;
+    overflow-x: auto !important;
+    scroll-snap-type: x mandatory;
+    gap: 0.85rem !important;
+    padding-bottom: 0.5rem;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .followed-card {
+    flex: 0 0 100%;
+    min-width: 100%;
+    max-width: 100%;
+    scroll-snap-align: center;
+  }
+
+  .mobile-swipe-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
+  }
+}
+
+
+/* =========================================
+   Sidebar Landscape Lock & Schedule Profile Clearance
+   ========================================= */
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  transform: translate3d(0, 0, 0);
+  -webkit-transform: translate3d(0, 0, 0);
+}
+
+@media (max-width: 767px) {
+  /* Keep Schedule week selector clear of the top-right floating Profile button */
+  .schedule-title-group {
+    padding-right: 3.25rem;
+  }
+
+  .schedule-title-group .page-title {
+    padding-right: 0;
+  }
+}
+
+
+/* =========================================
+   Schedule Header & Filter Bar Alignment (Mobile / Unfolded Portrait)
+   ========================================= */
+@media (max-width: 767px) {
+  .schedule-header {
+    align-items: stretch;
+  }
+
+  .schedule-filter-bar {
+    width: 100%;
+  }
+
+  .mobile-profile-btn {
+    top: calc(1rem + env(safe-area-inset-top));
+    right: max(1rem, env(safe-area-inset-right));
+  }
+
+  .schedule-title-group {
+    padding-right: 3rem;
+    min-height: 40px;
+    align-items: center;
+  }
+}
+
+@media (min-width: 560px) and (max-width: 767px) {
+  .mobile-profile-btn {
+    top: calc(1.25rem + env(safe-area-inset-top));
+    right: max(1.25rem, env(safe-area-inset-right));
+  }
+}
