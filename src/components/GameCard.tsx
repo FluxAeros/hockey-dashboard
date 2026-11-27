@@ -17,16 +17,6 @@ export function GameCard({ game, selected, onSelect, winProbability }: GameCardP
   const color = STATE_COLORS[state] ?? "#64748b";
   const info = getPeriodClockInfo(game.gameState, game.clock, game.periodDescriptor, game.startTimeUTC);
 
-  const getGameTypeTag = (type: number) => {
-    const num = Number(type);
-    switch (num) {
-      case 1: return <span className="game-type-tag pre" title="Preseason Game">PRE</span>;
-      case 2: return <span className="game-type-tag reg" title="Regular Season Game">REG</span>;
-      case 3: return <span className="game-type-tag ply" title="Playoff Game">PLY</span>;
-      default: return null;
-    }
-  };
-
   const wp = winProbability ?? game.winProbability;
 
   const getWinProb = (): { awayProb: number; homeProb: number } | null => {
@@ -115,17 +105,14 @@ export function GameCard({ game, selected, onSelect, winProbability }: GameCardP
       onClick={() => onSelect(game)}
       className={`game-card ${selected ? "selected" : ""} ${isLive ? "is-live" : isFinal ? "is-final" : "is-upcoming"}`}
     >
-      {/* Top Row: Status + Game Type on Left, Scheduled Time / Time Remaining in Upper Right */}
+      {/* Top Row: Status on Left, Scheduled Time / Time Remaining in Upper Right */}
       <div className="game-card-header">
-        <div className="game-card-header-left">
-          <div className="game-card-status">
-            <span
-              className={`status-dot ${isLive ? "pulse" : ""}`}
-              style={{ background: color }}
-            />
-            <span style={{ color }}>{label}</span>
-          </div>
-          {getGameTypeTag(game.gameType)}
+        <div className="game-card-status">
+          <span
+            className={`status-dot ${isLive ? "pulse" : ""}`}
+            style={{ background: color }}
+          />
+          <span style={{ color }}>{label}</span>
         </div>
         {renderCornerTime()}
       </div>

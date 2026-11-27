@@ -121,11 +121,9 @@ html {
   background-color: var(--bg-primary);
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
-  overflow-x: clip;
 }
 
 body {
-  overflow-x: clip;
   background-color: var(--bg-primary);
   color: var(--text-primary);
   font-family: var(--font-sans);
