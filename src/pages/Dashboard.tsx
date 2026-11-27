@@ -470,6 +470,7 @@ export default function Dashboard() {
               homeTeam: { ...prev.homeTeam, score: newHome }
             } : prev);
 
+            const isUnstarted = ["FUT", "PRE"].includes((currentGameState || "").toUpperCase());
             setScheduleGames(prevGames => prevGames.map(g => {
               if (g.id === game.id) {
                 return {
@@ -477,8 +478,8 @@ export default function Dashboard() {
                   gameState: currentGameState,
                   clock: boxData.clock || g.clock,
                   periodDescriptor: boxData.periodDescriptor || g.periodDescriptor,
-                  awayTeam: { ...g.awayTeam, score: newAway },
-                  homeTeam: { ...g.homeTeam, score: newHome }
+                  awayTeam: isUnstarted ? g.awayTeam : { ...g.awayTeam, score: newAway },
+                  homeTeam: isUnstarted ? g.homeTeam : { ...g.homeTeam, score: newHome }
                 };
               }
               return g;
@@ -587,6 +588,16 @@ export default function Dashboard() {
   }, [location.state, handleSelectGame, navigate]);
 
   useEffect(() => () => stopPolling(), [stopPolling]);
+
+  // Clicking the "Live" nav tab resets the dashboard back to its default view
+  useEffect(() => {
+    const handleReset = () => {
+      deselectGame();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    };
+    window.addEventListener("chelstatz:reset-live", handleReset);
+    return () => window.removeEventListener("chelstatz:reset-live", handleReset);
+  }, [deselectGame]);
 
   const stats = useCallback((): GameStats => {
     let homeXG = 0, awayXG = 0, homeShots = 0, awayShots = 0, homeGoals = 0, awayGoals = 0;

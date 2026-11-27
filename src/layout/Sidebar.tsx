@@ -5,9 +5,10 @@ import { useAuth } from "../context/AuthContext";
 import { BetaBadge } from "../components/BetaBadge";
 
 function useMobile() {
-  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia("(max-width: 767px)").matches);
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 767px)");
+    setIsMobile(mq.matches);
     const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
     mq.addEventListener("change", handler);
     return () => mq.removeEventListener("change", handler);
@@ -26,18 +27,25 @@ export function Sidebar() {
   const isMobile = useMobile();
   const { user, favorites, openAuthModal, logout } = useAuth();
 
-  const navLinks = user?.is_admin
+  const sidebarNavLinks = user?.is_admin
     ? [...BASE_NAV_LINKS, { to: "/admin", icon: ShieldCheck, label: "Admin" }]
     : BASE_NAV_LINKS;
 
+  const handleNavClick = (to: string) => {
+    if (to === "/") {
+      window.dispatchEvent(new CustomEvent("chelstatz:reset-live"));
+    }
+  };
+
   if (isMobile) {
     return (
-      <nav className="bottom-nav">
-        {navLinks.map(({ to, icon: Icon, label }) => (
+      <nav className="bottom-nav" aria-label="Primary navigation">
+        {BASE_NAV_LINKS.map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}
             to={to}
             end={to === "/"}
+            onClick={() => handleNavClick(to)}
             className={({ isActive }) => `bottom-nav-link${isActive ? " active" : ""}`}
           >
             <Icon size={22} />
@@ -49,7 +57,7 @@ export function Sidebar() {
   }
 
   return (
-    <aside className="sidebar">
+    <aside className="sidebar" aria-label="Primary navigation">
       <div className="sidebar-brand">
         <img
           src="/images/logo.png"
@@ -60,11 +68,12 @@ export function Sidebar() {
       </div>
       
       <nav className="sidebar-nav">
-        {navLinks.map(({ to, icon: Icon, label }) => (
+        {sidebarNavLinks.map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}
             to={to}
             end={to === "/"}
+            onClick={() => handleNavClick(to)}
             className={({ isActive }) => `nav-link${isActive ? " active" : ""}`}
           >
             <Icon className="nav-icon" />
@@ -99,9 +108,10 @@ export function Sidebar() {
             </button>
           </div>
         ) : (
-          <button className="nav-link auth-login-trigger" onClick={() => openAuthModal("login")}>
+          <button className="nav-link auth-login-trigger" onClick={() => openAuthModal("login")} title="Sign In / Register">
             <LogIn className="nav-icon" />
-            <span className="nav-text">Sign In / Register</span>
+            <span className="nav-text nav-text-desktop">Sign In / Register</span>
+            <span className="nav-text nav-text-rail">Sign In</span>
           </button>
         )}
       </div>

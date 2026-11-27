@@ -3,7 +3,7 @@ import type { NHLGame } from "../types";
 import { GameCard } from "../components/GameCard";
 import { useNavigate } from "react-router-dom";
 import { formatLocalDateString, shiftDate, todayDateString } from "../utils/helpers";
-import { ChevronLeft, ChevronRight, Filter, Star, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronDown, Filter, Star, X } from "lucide-react";
 import { NHL_TEAMS_METADATA, CONFERENCES } from "../utils/nhlDivisions";
 import { useAuth } from "../context/AuthContext";
 
@@ -40,6 +40,16 @@ export default function Schedule() {
   const [favoritesOnly, setFavoritesOnly] = useState<boolean>(false);
 
   const [searchingNext, setSearchingNext] = useState<boolean>(false);
+  const [collapsedDays, setCollapsedDays] = useState<Set<string>>(new Set());
+
+  const toggleDayCollapsed = (date: string) => {
+    setCollapsedDays((prev) => {
+      const next = new Set(prev);
+      if (next.has(date)) next.delete(date);
+      else next.add(date);
+      return next;
+    });
+  };
 
   const navDirectionRef = useRef<"forward" | "backward">("forward");
 
@@ -576,29 +586,42 @@ export default function Schedule() {
           ) : (
             daysWithFilteredGames
               .filter((day) => day.filteredGames.length > 0)
-              .map((day) => (
-                <div key={day.date} className="schedule-day-section">
-                  <h2 className="day-header">
-                    {formatLocalDateString(day.date)}
-                    <span className="game-count">
-                      {day.filteredGames.length} game{day.filteredGames.length !== 1 ? "s" : ""}
-                    </span>
-                  </h2>
+              .map((day) => {
+                const isDayCollapsed = collapsedDays.has(day.date);
+                return (
+                  <div key={day.date} className={`schedule-day-section ${isDayCollapsed ? "is-collapsed" : ""}`}>
+                    <button
+                      type="button"
+                      className="day-header day-header-toggle"
+                      onClick={() => toggleDayCollapsed(day.date)}
+                      aria-expanded={!isDayCollapsed}
+                    >
+                      <span className="day-header-left">
+                        <ChevronDown size={18} className={`day-chevron ${isDayCollapsed ? "collapsed" : ""}`} />
+                        <span>{formatLocalDateString(day.date)}</span>
+                      </span>
+                      <span className="game-count">
+                        {day.filteredGames.length} game{day.filteredGames.length !== 1 ? "s" : ""}
+                      </span>
+                    </button>
 
-                  <div className="game-cards-container">
-                    {day.filteredGames.map((game) => (
-                      <GameCard
-                        key={game.id}
-                        game={game}
-                        selected={false}
-                        onSelect={() =>
-                          navigate("/", { state: { selectedGame: game, selectedDate: day.date } })
-                        }
-                      />
-                    ))}
+                    {!isDayCollapsed && (
+                      <div className="game-cards-container">
+                        {day.filteredGames.map((game) => (
+                          <GameCard
+                            key={game.id}
+                            game={game}
+                            selected={false}
+                            onSelect={() =>
+                              navigate("/", { state: { selectedGame: game, selectedDate: day.date } })
+                            }
+                          />
+                        ))}
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))
+                );
+              })
           )}
         </div>
       )}

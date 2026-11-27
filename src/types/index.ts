@@ -77,6 +77,8 @@ export interface PowerPlayInfo {
   advantage: string; // e.g. "5-on-4"
   shortHandedTeamAbbr: string;
   shortHandedTeamId?: number;
+  clockRunning?: boolean;
+  inIntermission?: boolean;
   penalty?: PenaltyInfo | null;
 }
 

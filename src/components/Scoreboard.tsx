@@ -1,6 +1,6 @@
 import type { GameStats, TimeoutsInfo, PowerPlayInfo } from "../types";
-import { TEAM_COLORS, getPeriodClockInfo } from "../utils/helpers";
-import { NHL_TEAMS } from "../utils/teamsData";
+import { TEAM_COLORS, getReadableTeamColor, getPeriodClockInfo } from "../utils/helpers";
+import { NHL_TEAMS, getTeamCityAndMascot } from "../utils/teamsData";
 import { PenaltyBoxMugshot } from "./PenaltyBoxMugshot";
 
 interface ScoreboardProps {
@@ -29,30 +29,28 @@ interface ScoreboardProps {
 }
 
 function getTeamLogo(abbr: string): string {
-  const team = NHL_TEAMS.find(t => t.teamAbbrev === abbr);
+  const team = NHL_TEAMS.find((t) => t.teamAbbrev === abbr);
   return team?.teamLogo || `https://assets.nhle.com/logos/nhl/svg/${abbr}_light.svg`;
 }
 
 export function calculateWinProbability(stats: GameStats): { homeProb: number; awayProb: number } {
-  // Pre-game baseline
   if (stats.homeGoals === 0 && stats.awayGoals === 0 && stats.homeShots === 0 && stats.awayShots === 0) {
     return { homeProb: 53.5, awayProb: 46.5 };
   }
 
-  // Logistic model combining Score differential, xG differential, and Shot pressure
   const scoreDiff = stats.homeGoals - stats.awayGoals;
   const xgDiff = stats.homeXG - stats.awayXG;
   const shotDiff = stats.homeShots - stats.awayShots;
   const homeAdvantage = 0.14;
 
-  const logit = homeAdvantage + (scoreDiff * 1.35) + (xgDiff * 0.55) + (shotDiff * 0.05);
+  const logit = homeAdvantage + scoreDiff * 1.35 + xgDiff * 0.55 + shotDiff * 0.05;
   const homeProb = 1 / (1 + Math.exp(-logit));
   const roundedHome = Math.round(homeProb * 1000) / 10;
   const clampedHome = Math.min(99.5, Math.max(0.5, roundedHome));
 
   return {
     homeProb: clampedHome,
-    awayProb: Math.round((100 - clampedHome) * 10) / 10
+    awayProb: Math.round((100 - clampedHome) * 10) / 10,
   };
 }
 
@@ -67,34 +65,36 @@ export function Scoreboard({
   clock,
   periodDescriptor,
   startTimeUTC,
-  timeouts,
   powerPlay,
   testPenaltyPreview,
   onDismissTestPenalty,
 }: ScoreboardProps) {
-  const awayColor = TEAM_COLORS[awayTeamAbbr] || "#97C459";
-  const homeColor = TEAM_COLORS[homeTeamAbbr] || "#378ADD";
+  const awayColor = TEAM_COLORS[awayTeamAbbr] || "#006847";
+  const homeColor = TEAM_COLORS[homeTeamAbbr] || "#0284C7";
+  const awayTextColor = getReadableTeamColor(awayTeamAbbr);
+  const homeTextColor = getReadableTeamColor(homeTeamAbbr);
+
   const awayLogo = getTeamLogo(awayTeamAbbr);
   const homeLogo = getTeamLogo(homeTeamAbbr);
+  const awayParts = getTeamCityAndMascot(awayTeamAbbr, awayTeamName);
+  const homeParts = getTeamCityAndMascot(homeTeamAbbr, homeTeamName);
 
   const calculated = calculateWinProbability(stats);
   const homeProb = winProbability?.homeProb ?? calculated.homeProb;
   const awayProb = winProbability?.awayProb ?? calculated.awayProb;
 
-  const isLive = gameState === "LIVE" || gameState === "CRIT";
-  const isFinal = ["FINAL", "OFF", "OVER"].includes((gameState || "").toUpperCase());
+  const stateUpper = (gameState || "").toUpperCase();
+  const isLive = stateUpper === "LIVE" || stateUpper === "CRIT";
+  const isFinal = ["FINAL", "OFF", "OVER"].includes(stateUpper);
+  const isPreGame = !isLive && !isFinal;
   const info = getPeriodClockInfo(gameState, clock, periodDescriptor, startTimeUTC);
 
-  // Timeouts: NHL rules provide 1 timeout per team per game
-  const awayTimeouts = timeouts?.awayRemaining ?? 1;
-  const homeTimeouts = timeouts?.homeRemaining ?? 1;
-
-  // Mock test penalty preview if requested
   const mockTestPowerPlay: PowerPlayInfo = {
     hasPowerPlay: true,
     ppTeamAbbr: homeTeamAbbr,
     advantage: "5-on-4",
     shortHandedTeamAbbr: awayTeamAbbr,
+    clockRunning: true,
     penalty: {
       playerId: 8473419,
       playerName: "Brad Marchand",
@@ -105,25 +105,30 @@ export function Scoreboard({
       durationMinutes: 2,
       timeRemaining: "01:45",
       secondsRemaining: 105,
-    }
+    },
   };
 
   const activePowerPlay = testPenaltyPreview ? mockTestPowerPlay : powerPlay;
-  const isAwayPP = activePowerPlay?.hasPowerPlay && activePowerPlay.ppTeamAbbr === awayTeamAbbr;
-  const isHomePP = activePowerPlay?.hasPowerPlay && activePowerPlay.ppTeamAbbr === homeTeamAbbr;
-  const isAwaySH = activePowerPlay?.hasPowerPlay && activePowerPlay.shortHandedTeamAbbr === awayTeamAbbr;
-  const isHomeSH = activePowerPlay?.hasPowerPlay && activePowerPlay.shortHandedTeamAbbr === homeTeamAbbr;
+  const isAwayPP = Boolean(activePowerPlay?.hasPowerPlay && activePowerPlay.ppTeamAbbr === awayTeamAbbr);
+  const isHomePP = Boolean(activePowerPlay?.hasPowerPlay && activePowerPlay.ppTeamAbbr === homeTeamAbbr);
+  const isAwaySH = Boolean(activePowerPlay?.hasPowerPlay && activePowerPlay.shortHandedTeamAbbr === awayTeamAbbr);
+  const isHomeSH = Boolean(activePowerPlay?.hasPowerPlay && activePowerPlay.shortHandedTeamAbbr === homeTeamAbbr);
 
   return (
     <div className="scoreboard-container">
-      <div className="scoreboard">
+      {/* Desktop / Unfolded Landscape Unified Scoreboard + Integrated Win Probability */}
+      <div className="scoreboard-unified-desktop">
+        <div className="scoreboard scoreboard-desktop-view">
         {/* Away Team Section */}
         <div
           className={`scoreboard-team away ${isAwayPP ? "is-power-play" : ""} ${isAwaySH ? "is-short-handed" : ""}`}
-          style={{ borderLeftColor: isAwayPP ? "#f59e0b" : awayColor, "--team-color": awayColor } as React.CSSProperties}
+          style={{
+            "--team-color": awayColor,
+            "--team-text-color": awayTextColor,
+          } as React.CSSProperties}
         >
           <img src={awayLogo} alt="" className="scoreboard-team-bg-logo" aria-hidden="true" />
-          
+
           {isAwayPP && (
             <div className="team-special-teams-tag pp">
               POWER PLAY ({activePowerPlay?.advantage || "5-on-4"})
@@ -135,32 +140,16 @@ export function Scoreboard({
             </div>
           )}
 
-          {/* Prominent Team Name Header */}
-          <div className="team-name-primary">
-            <span className="team-full-name">{awayTeamName}</span>
-            <span className="team-role-pill away">AWAY · {awayTeamAbbr}</span>
+          <div className="team-name-stack">
+            {awayParts.city && <span className="team-city-label">{awayParts.city}</span>}
+            <span className="team-full-name">{awayParts.mascot}</span>
+            <span className="team-accent-bar" aria-hidden="true" />
           </div>
 
-          <div className="team-score">{stats.awayGoals}</div>
+          <div className="team-score">{isPreGame ? "–" : stats.awayGoals}</div>
 
-          {/* Stats & Timeouts Row */}
           <div className="team-stats-row">
             <div className="team-stats">{stats.awayShots} SOG · {stats.awayXG.toFixed(2)} xG</div>
-            <div 
-              className="scorebug-timeouts"
-              title={`Timeouts: ${awayTimeouts > 0 ? "1 Remaining" : "Exhausted"} (NHL Rule 87: 1 per game)`}
-              aria-label={`Timeouts: ${awayTimeouts} remaining`}
-            >
-              <span className="scorebug-tol-label">TO</span>
-              <div className="scorebug-bars-rack">
-                {Array.from({ length: Math.max(1, awayTimeouts) }).map((_, i) => (
-                  <span
-                    key={i}
-                    className={`scorebug-bar ${i < awayTimeouts ? "lit" : "spent"}`}
-                  />
-                ))}
-              </div>
-            </div>
           </div>
         </div>
 
@@ -169,7 +158,7 @@ export function Scoreboard({
           {isLive ? (
             <div className={`scoreboard-clock-hub ${info.statusType === "intermission" ? "is-intermission" : ""}`}>
               <div className="period-tag">
-                <span className={`clock-dot ${info.isRunning ? "running" : (info.statusType === "intermission" ? "intermission" : "stopped")}`} />
+                <span className={`clock-dot ${info.isRunning ? "running" : info.statusType === "intermission" ? "intermission" : "stopped"}`} />
                 <span>{info.primaryText}</span>
               </div>
 
@@ -211,7 +200,10 @@ export function Scoreboard({
         {/* Home Team Section */}
         <div
           className={`scoreboard-team home ${isHomePP ? "is-power-play" : ""} ${isHomeSH ? "is-short-handed" : ""}`}
-          style={{ borderRightColor: isHomePP ? "#f59e0b" : homeColor, "--team-color": homeColor } as React.CSSProperties}
+          style={{
+            "--team-color": homeColor,
+            "--team-text-color": homeTextColor,
+          } as React.CSSProperties}
         >
           <img src={homeLogo} alt="" className="scoreboard-team-bg-logo" aria-hidden="true" />
 
@@ -226,68 +218,140 @@ export function Scoreboard({
             </div>
           )}
 
-          {/* Prominent Team Name Header */}
-          <div className="team-name-primary">
-            <span className="team-role-pill home">{homeTeamAbbr} · HOME</span>
-            <span className="team-full-name">{homeTeamName}</span>
+          <div className="team-name-stack">
+            {homeParts.city && <span className="team-city-label">{homeParts.city}</span>}
+            <span className="team-full-name">{homeParts.mascot}</span>
+            <span className="team-accent-bar" aria-hidden="true" />
           </div>
 
-          <div className="team-score">{stats.homeGoals}</div>
+          <div className="team-score">{isPreGame ? "–" : stats.homeGoals}</div>
 
-          {/* Stats & Timeouts Row */}
           <div className="team-stats-row">
-            <div 
-              className="scorebug-timeouts"
-              title={`Timeouts: ${homeTimeouts > 0 ? "1 Remaining" : "Exhausted"} (NHL Rule 87: 1 per game)`}
-              aria-label={`Timeouts: ${homeTimeouts} remaining`}
-            >
-              <span className="scorebug-tol-label">TO</span>
-              <div className="scorebug-bars-rack">
-                {Array.from({ length: Math.max(1, homeTimeouts) }).map((_, i) => (
-                  <span
-                    key={i}
-                    className={`scorebug-bar ${i < homeTimeouts ? "lit" : "spent"}`}
-                  />
-                ))}
-              </div>
-            </div>
             <div className="team-stats">{stats.homeShots} SOG · {stats.homeXG.toFixed(2)} xG</div>
           </div>
         </div>
       </div>
 
-      {/* Mobile Stats Summary (visible only on small screens) */}
-      <div className="mobile-stats-summary">
-        <div className="mobile-stat-strip" style={{ "--strip-color": awayColor } as React.CSSProperties}>
-          <span className="mobile-stat-team">{awayTeamAbbr}</span>
-          <span className="mobile-stat-detail">{stats.awayShots} SOG</span>
-          <span className="mobile-stat-detail">{stats.awayXG.toFixed(2)} xG</span>
-          <div 
-            className="scorebug-timeouts"
-            title={`Timeouts: ${awayTimeouts > 0 ? "1 Remaining" : "Exhausted"}`}
-          >
-            <span className="scorebug-tol-label">TO</span>
-            <div className="scorebug-bars-rack">
-              {Array.from({ length: Math.max(1, awayTimeouts) }).map((_, i) => (
-                <span key={i} className={`scorebug-bar ${i < awayTimeouts ? "lit" : "spent"}`} />
-              ))}
+        {/* Integrated Win Probability Footer inside Desktop Scoreboard */}
+        <div className="scoreboard-integrated-wp">
+          <div className="scoreboard-integrated-wp-labels">
+            <span style={{ color: awayTextColor }}>
+              {awayTeamAbbr} {awayProb}%
+            </span>
+            <span className="scoreboard-integrated-wp-title">Live Win Probability</span>
+            <span style={{ color: homeTextColor }}>
+              {homeProb}% {homeTeamAbbr}
+            </span>
+          </div>
+          <div className="win-prob-track">
+            <div className="win-prob-fill away" style={{ width: `${awayProb}%`, backgroundColor: awayColor }} />
+            <div className="win-prob-fill home" style={{ width: `${homeProb}%`, backgroundColor: homeColor }} />
+          </div>
+        </div>
+      </div>
+
+      {/* ======================================================
+          Mobile Unified Face-Off Hero Card (Option 2)
+         ====================================================== */}
+      <div
+        className="mobile-faceoff-card"
+        style={{
+          "--away-color": awayColor,
+          "--home-color": homeColor,
+          "--away-text-color": awayTextColor,
+          "--home-text-color": homeTextColor,
+        } as React.CSSProperties}
+      >
+        {/* Top Status & Clock Bar */}
+        <div className="faceoff-top-bar">
+          {isLive ? (
+            <div className={`faceoff-status-pill ${info.statusType === "intermission" ? "intermission" : "live"}`}>
+              <span className={`clock-dot ${info.isRunning ? "running" : info.statusType === "intermission" ? "intermission" : "stopped"}`} />
+              <span>{info.shortText}</span>
+              {info.timeRemaining && (
+                <>
+                  <span className="faceoff-sep">·</span>
+                  <span className="faceoff-clock-digits">{info.timeRemaining}</span>
+                </>
+              )}
+              {!info.isRunning && info.statusType !== "intermission" && (
+                <span className="faceoff-stop-tag">STOP</span>
+              )}
+            </div>
+          ) : isFinal ? (
+            <div className="faceoff-status-pill final">{info.primaryText}</div>
+          ) : (
+            <div className="faceoff-status-pill pre">
+              {info.nextPeriodStartEstimate || "Scheduled"}
+            </div>
+          )}
+
+          {(isAwayPP || isHomePP) && (
+            <span className="faceoff-pp-pill">
+              {activePowerPlay?.ppTeamAbbr} PP · {activePowerPlay?.advantage}
+            </span>
+          )}
+        </div>
+
+        {/* Center Symmetrical Face-Off Row */}
+        <div className="faceoff-main-grid">
+          {/* Away Column */}
+          <div className={`faceoff-team-col away ${isAwayPP ? "is-pp" : ""}`}>
+            <div className="faceoff-logo-wrap">
+              <img src={awayLogo} alt={awayTeamName} className="faceoff-team-logo" />
+            </div>
+            {awayParts.city && <div className="faceoff-team-city">{awayParts.city}</div>}
+            <div className="faceoff-team-mascot">{awayParts.mascot}</div>
+            <div className="faceoff-team-metrics">
+              <span>{stats.awayShots} SOG</span>
+              <span>{stats.awayXG.toFixed(2)} xG</span>
+            </div>
+          </div>
+
+          {/* Center Scoreline */}
+          <div className="faceoff-score-center">
+            {isPreGame ? (
+              <span className="faceoff-vs-badge">VS</span>
+            ) : (
+              <div className="faceoff-scoreline">
+                <span className="faceoff-score-num">{stats.awayGoals}</span>
+                <span className="faceoff-score-dash">–</span>
+                <span className="faceoff-score-num">{stats.homeGoals}</span>
+              </div>
+            )}
+            {info.statusType === "intermission" && info.nextPeriodLabel && (
+              <div className="faceoff-int-note">{info.nextPeriodLabel}</div>
+            )}
+          </div>
+
+          {/* Home Column */}
+          <div className={`faceoff-team-col home ${isHomePP ? "is-pp" : ""}`}>
+            <div className="faceoff-logo-wrap">
+              <img src={homeLogo} alt={homeTeamName} className="faceoff-team-logo" />
+            </div>
+            {homeParts.city && <div className="faceoff-team-city">{homeParts.city}</div>}
+            <div className="faceoff-team-mascot">{homeParts.mascot}</div>
+            <div className="faceoff-team-metrics">
+              <span>{stats.homeShots} SOG</span>
+              <span>{stats.homeXG.toFixed(2)} xG</span>
             </div>
           </div>
         </div>
-        <div className="mobile-stat-strip" style={{ "--strip-color": homeColor } as React.CSSProperties}>
-          <span className="mobile-stat-team">{homeTeamAbbr}</span>
-          <span className="mobile-stat-detail">{stats.homeShots} SOG</span>
-          <span className="mobile-stat-detail">{stats.homeXG.toFixed(2)} xG</span>
-          <div 
-            className="scorebug-timeouts"
-            title={`Timeouts: ${homeTimeouts > 0 ? "1 Remaining" : "Exhausted"}`}
-          >
-            <span className="scorebug-tol-label">TO</span>
-            <div className="scorebug-bars-rack">
-              {Array.from({ length: Math.max(1, homeTimeouts) }).map((_, i) => (
-                <span key={i} className={`scorebug-bar ${i < homeTimeouts ? "lit" : "spent"}`} />
-              ))}
-            </div>
+
+        {/* Integrated Win Probability Footer */}
+        <div className="faceoff-win-prob">
+          <div className="faceoff-wp-labels">
+            <span style={{ color: awayTextColor }}>
+              {awayTeamAbbr} {awayProb}%
+            </span>
+            <span className="faceoff-wp-title">WIN PROB</span>
+            <span style={{ color: homeTextColor }}>
+              {homeProb}% {homeTeamAbbr}
+            </span>
+          </div>
+          <div className="win-prob-track">
+            <div className="win-prob-fill away" style={{ width: `${awayProb}%`, backgroundColor: awayColor }} />
+            <div className="win-prob-fill home" style={{ width: `${homeProb}%`, backgroundColor: homeColor }} />
           </div>
         </div>
       </div>
@@ -296,31 +360,12 @@ export function Scoreboard({
       {activePowerPlay?.hasPowerPlay && activePowerPlay.penalty && (
         <PenaltyBoxMugshot
           powerPlay={activePowerPlay}
+          clockRunning={clock?.running}
+          inIntermission={clock?.inIntermission}
           isTestPreview={testPenaltyPreview}
           onDismissTest={onDismissTestPenalty}
         />
       )}
-
-      {/* Win Probability Bar */}
-      <div className="win-prob-section">
-        <div className="win-prob-header">
-          <span className="win-prob-title">Live Win Probability</span>
-          <div className="win-prob-labels">
-            <span style={{ color: awayColor }}>{awayTeamAbbr} {awayProb}%</span>
-            <span style={{ color: homeColor }}>{homeProb}% {homeTeamAbbr}</span>
-          </div>
-        </div>
-        <div className="win-prob-track">
-          <div 
-            className="win-prob-fill away" 
-            style={{ width: `${awayProb}%`, backgroundColor: awayColor }} 
-          />
-          <div 
-            className="win-prob-fill home" 
-            style={{ width: `${homeProb}%`, backgroundColor: homeColor }} 
-          />
-        </div>
-      </div>
     </div>
   );
 }

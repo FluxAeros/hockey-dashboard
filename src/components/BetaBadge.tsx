@@ -1,5 +1,6 @@
 import { Sparkles } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { APP_VERSION } from "../utils/version";
 
 export function BetaBadge() {
   const { openFeedbackModal } = useAuth();
@@ -12,7 +13,7 @@ export function BetaBadge() {
       type="button"
     >
       <Sparkles size={12} className="beta-badge-icon" />
-      <span>v0.9.1-beta</span>
+      <span>v{APP_VERSION}-beta</span>
     </button>
   );
 }

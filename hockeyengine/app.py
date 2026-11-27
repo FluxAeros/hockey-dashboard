@@ -2,6 +2,7 @@ import os
 import asyncio
 import traceback
 from collections import defaultdict
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import List, Optional, Dict, Any, Set
 from contextlib import asynccontextmanager
@@ -696,29 +697,51 @@ async def get_tailored_feed(user: Dict[str, Any] = Depends(get_current_user)):
         if s.get("teamAbbrev", {}).get("default") in fav_set
     ]
 
-    # Fetch current week schedule
-    schedule_data = await get_schedule_week()
-    game_week = schedule_data.get("gameWeek", [])
-    
+    # Fetch current week AND past 7 days concurrently so Recent Results includes the past week
+    past_week_date = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
+
+    async def fetch_past_week():
+        url = f"https://api-web.nhle.com/v1/schedule/{past_week_date}"
+        res = await nhl_get(url)
+        if res.status_code != 200:
+            return {"gameWeek": []}
+        return fix_double_encoding(res.json())
+
+    schedule_data, past_schedule_data = await asyncio.gather(
+        get_schedule_week(),
+        cache.get_or_set(f"schedule_week_{past_week_date}", fetch_past_week, ttl=300),
+    )
+
+    combined_days = list(past_schedule_data.get("gameWeek", [])) + list(schedule_data.get("gameWeek", []))
+    seen_ids = set()
     upcoming_games = []
     recent_games = []
 
-    for day in game_week:
+    for day in combined_days:
+        day_date = day.get("date")
         for game in day.get("games", []):
+            gid = game.get("id")
+            if gid in seen_ids:
+                continue
+            seen_ids.add(gid)
+
             away_abbr = game.get("awayTeam", {}).get("abbrev")
             home_abbr = game.get("homeTeam", {}).get("abbrev")
-            
+
             if away_abbr in fav_set or home_abbr in fav_set:
-                state = game.get("gameState")
-                if state in ["FINAL", "OFF"]:
-                    recent_games.append({**game, "gameDate": day.get("date")})
+                state = (game.get("gameState") or "").upper()
+                if state in ["FINAL", "OFF", "OVER"]:
+                    recent_games.append({**game, "gameDate": day_date})
                 else:
-                    upcoming_games.append({**game, "gameDate": day.get("date")})
+                    upcoming_games.append({**game, "gameDate": day_date})
+
+    recent_games.sort(key=lambda g: (g.get("gameDate") or "", g.get("startTimeUTC") or ""), reverse=True)
+    upcoming_games.sort(key=lambda g: (g.get("gameDate") or "", g.get("startTimeUTC") or ""))
 
     return fix_double_encoding({
         "favorites": favs,
         "upcomingGames": upcoming_games[:6],
-        "recentGames": recent_games[-6:],
+        "recentGames": recent_games[:6],
         "standings": fav_standings
     })
 
@@ -1019,10 +1042,16 @@ async def fetch_game_live_payload(gid: str, force_fresh: bool = False) -> Dict[s
                 }
 
         # Parse manpower & active power play / penalty
-        last_play = plays[-1] if plays else {}
-        sit_code = str(last_play.get("situationCode", "1551"))
-        away_skaters = int(sit_code[1]) if len(sit_code) == 4 and sit_code[1].isdigit() else 5
-        home_skaters = int(sit_code[2]) if len(sit_code) == 4 and sit_code[2].isdigit() else 5
+        # Scan backwards for the most recent play with a valid 4-digit situationCode
+        sit_code = "1551"
+        for p in reversed(plays):
+            sc = str(p.get("situationCode", ""))
+            if len(sc) == 4 and sc.isdigit():
+                sit_code = sc
+                break
+
+        away_skaters = int(sit_code[1])
+        home_skaters = int(sit_code[2])
 
         has_pp = False
         pp_abbr = ""
@@ -1047,8 +1076,12 @@ async def fetch_game_live_payload(gid: str, force_fresh: bool = False) -> Dict[s
             advantage = f"{away_skaters}-on-{home_skaters}"
 
         active_penalty = None
-        if has_pp:
-            for p in reversed(plays):
+        clock_running = bool(clock.get("running", False)) if clock else False
+        in_intermission = bool(clock.get("inIntermission", False)) if clock else False
+
+        if has_pp and game_state in ["LIVE", "CRIT"]:
+            for idx in range(len(plays) - 1, -1, -1):
+                p = plays[idx]
                 if p.get("typeDescKey") == "penalty":
                     det = p.get("details", {})
                     event_team = det.get("eventOwnerTeamId")
@@ -1056,26 +1089,52 @@ async def fetch_game_live_payload(gid: str, force_fresh: bool = False) -> Dict[s
                         pid = det.get("committedByPlayerId") or det.get("servedByPlayerId")
                         desc_k = det.get("descKey", "minor-penalty")
                         infraction = desc_k.replace("-", " ").title()
-                        duration = det.get("duration", 2)
+                        duration = int(det.get("duration", 2) or 2)
+
+                        # Count power-play goals scored by pp_id AFTER this penalty
+                        pp_goals_after = 0
+                        for later_play in plays[idx + 1:]:
+                            if later_play.get("typeDescKey") == "goal":
+                                later_team = later_play.get("details", {}).get("eventOwnerTeamId")
+                                if later_team == pp_id:
+                                    pp_goals_after += 1
+
+                        # A PPG immediately terminates a 2-minute minor (or one half of a 4-minute double-minor)
+                        if duration <= 2 and pp_goals_after >= 1:
+                            has_pp = False
+                            break
+                        if duration == 4 and pp_goals_after >= 2:
+                            has_pp = False
+                            break
 
                         pen_period = p.get("periodDescriptor", {}).get("number", 1)
                         pen_time_sec = time_to_seconds(p.get("timeInPeriod", "00:00"))
                         curr_period = period_descriptor.get("number", 1) if period_descriptor else pen_period
-                        curr_time_sec = 0
-                        if clock and clock.get("timeRemaining"):
+                        period_len = 300 if (period_descriptor and period_descriptor.get("periodType") == "OT" and curr_period == 4) else 1200
+
+                        curr_time_sec = pen_time_sec
+                        if clock and (clock.get("secondsRemaining") is not None or clock.get("timeRemaining")):
                             rem_sec = clock.get("secondsRemaining")
                             if rem_sec is None:
                                 rem_sec = time_to_seconds(clock.get("timeRemaining", "20:00"))
-                            curr_time_sec = 1200 - rem_sec
+                            curr_time_sec = max(0, period_len - int(rem_sec))
 
-                        elapsed_penalty = 0
                         if curr_period == pen_period:
                             elapsed_penalty = max(0, curr_time_sec - pen_time_sec)
                         elif curr_period > pen_period:
-                            elapsed_penalty = (1200 - pen_time_sec) + curr_time_sec
+                            elapsed_penalty = max(0, (curr_period - pen_period) * 1200 - pen_time_sec + curr_time_sec)
+                        else:
+                            elapsed_penalty = 0
 
-                        penalty_total_sec = duration * 60
+                        effective_duration = 2 if (duration == 4 and pp_goals_after == 1) else duration
+                        penalty_total_sec = effective_duration * 60
                         penalty_rem_sec = max(0, penalty_total_sec - elapsed_penalty)
+
+                        # If the penalty clock has already expired, clear the power play
+                        if penalty_rem_sec <= 0:
+                            has_pp = False
+                            break
+
                         m = penalty_rem_sec // 60
                         s = penalty_rem_sec % 60
                         time_rem_str = f"{m:02d}:{s:02d}"
@@ -1088,19 +1147,21 @@ async def fetch_game_live_payload(gid: str, force_fresh: bool = False) -> Dict[s
                             "positionCode": player_info.get("positionCode"),
                             "headshot": player_info.get("headshot", f"https://assets.nhle.com/mugs/nhl/latest/{pid}.png"),
                             "infraction": infraction,
-                            "durationMinutes": duration,
+                            "durationMinutes": effective_duration,
                             "timeRemaining": time_rem_str,
                             "secondsRemaining": penalty_rem_sec
                         }
                         break
 
         power_play_data = {
-            "hasPowerPlay": has_pp,
-            "ppTeamAbbr": pp_abbr,
-            "ppTeamId": pp_id,
-            "advantage": advantage,
-            "shortHandedTeamAbbr": sh_abbr,
-            "shortHandedTeamId": sh_id,
+            "hasPowerPlay": has_pp and active_penalty is not None,
+            "ppTeamAbbr": pp_abbr if has_pp else "",
+            "ppTeamId": pp_id if has_pp else None,
+            "advantage": advantage if has_pp else "5-on-5",
+            "shortHandedTeamAbbr": sh_abbr if has_pp else "",
+            "shortHandedTeamId": sh_id if has_pp else None,
+            "clockRunning": clock_running,
+            "inIntermission": in_intermission,
             "penalty": active_penalty
         }
 
@@ -1122,6 +1183,26 @@ async def fetch_game_live_payload(gid: str, force_fresh: bool = False) -> Dict[s
     else:
         clock = box_data.get("clock")
         period_descriptor = box_data.get("periodDescriptor")
+
+    if game_state in ["LIVE", "CRIT"]:
+        b_away = box_data.get("awayTeam") or {}
+        b_home = box_data.get("homeTeam") or {}
+        b_away_abbr = b_away.get("abbrev") or ""
+        b_home_abbr = b_home.get("abbrev") or ""
+        if b_away_abbr and b_home_abbr:
+            p_num = (period_descriptor or {}).get("number")
+            p_time = (clock or {}).get("timeRemaining") or ""
+            p_lbl = f"P{p_num} {p_time}".strip() if p_num else p_time
+            asyncio.create_task(
+                dispatch_goal_push_if_scored(
+                    gid,
+                    b_away_abbr,
+                    b_home_abbr,
+                    int(b_away.get("score") or 0),
+                    int(b_home.get("score") or 0),
+                    p_lbl,
+                )
+            )
 
     return {
         "shots": processed_shots,
@@ -1508,3 +1589,166 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)
+
+
+
+# ==========================================
+# Web Push Goal Notifications (iOS PWA & Desktop)
+# ==========================================
+import json as _push_json
+from db import (
+    upsert_push_subscription,
+    delete_push_subscription,
+    get_push_subscriptions_for_teams,
+    get_push_subscription_by_endpoint,
+)
+
+VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY", "")
+VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY", "")
+VAPID_CLAIMS_EMAIL = os.environ.get("VAPID_CLAIMS_EMAIL", "mailto:alerts@chelstatz.app")
+
+_LAST_NOTIFIED_SCORES: Dict[str, tuple] = {}
+
+
+class PushSubscribeRequest(BaseModel):
+    subscription: Dict[str, Any]
+    teams: List[str] = []
+
+
+class PushEndpointRequest(BaseModel):
+    endpoint: str
+
+
+def _send_web_push(sub: Dict[str, Any], payload: Dict[str, Any]) -> bool:
+    if not VAPID_PUBLIC_KEY or not VAPID_PRIVATE_KEY:
+        return False
+    try:
+        from pywebpush import webpush, WebPushException
+    except ImportError:
+        return False
+
+    try:
+        webpush(
+            subscription_info={
+                "endpoint": sub["endpoint"],
+                "keys": sub["keys"],
+            },
+            data=_push_json.dumps(payload),
+            vapid_private_key=VAPID_PRIVATE_KEY,
+            vapid_claims={"sub": VAPID_CLAIMS_EMAIL},
+        )
+        return True
+    except WebPushException as exc:
+        status = getattr(getattr(exc, "response", None), "status_code", None)
+        if status in (404, 410):
+            delete_push_subscription(sub["endpoint"])
+        return False
+    except Exception as exc:
+        print(f"Web Push send error: {exc}")
+        return False
+
+
+async def dispatch_goal_push_if_scored(
+    game_id: str,
+    away_abbr: str,
+    home_abbr: str,
+    away_score: int,
+    home_score: int,
+    period_label: str = "",
+) -> None:
+    """Compare against last known score for a live game and push goal alerts to subscribers."""
+    gid = str(game_id)
+    prev = _LAST_NOTIFIED_SCORES.get(gid)
+    _LAST_NOTIFIED_SCORES[gid] = (away_score, home_score)
+    if prev is None:
+        return
+
+    prev_away, prev_home = prev
+    scoring_team = None
+    if home_score > prev_home:
+        scoring_team = home_abbr
+    elif away_score > prev_away:
+        scoring_team = away_abbr
+
+    if not scoring_team:
+        return
+
+    subs = get_push_subscriptions_for_teams([away_abbr, home_abbr])
+    if not subs:
+        return
+
+    payload = {
+        "title": f"🚨 GOAL! {scoring_team} scores!",
+        "body": f"{away_abbr} {away_score} – {home_score} {home_abbr}" + (f" · {period_label}" if period_label else ""),
+        "icon": "/pwa-192x192.png",
+        "badge": "/favicon-32x32.png",
+        "tag": f"goal-{gid}-{away_score}-{home_score}",
+        "url": "/",
+    }
+
+    for sub in subs:
+        await asyncio.to_thread(_send_web_push, sub, payload)
+
+
+@app.get("/push/vapid-public-key")
+async def get_vapid_public_key():
+    return {
+        "publicKey": VAPID_PUBLIC_KEY or None,
+        "configured": bool(VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY),
+    }
+
+
+@app.post("/push/subscribe")
+async def subscribe_push(
+    req: PushSubscribeRequest,
+    authorization: Optional[str] = Header(default=None),
+):
+    endpoint = req.subscription.get("endpoint")
+    keys = req.subscription.get("keys") or {}
+    p256dh = keys.get("p256dh")
+    auth = keys.get("auth")
+    if not endpoint or not p256dh or not auth:
+        raise HTTPException(status_code=400, detail="Invalid push subscription payload.")
+
+    user_id = None
+    if authorization and authorization.startswith("Bearer "):
+        decoded = decode_token(authorization.split(" ", 1)[1])
+        if decoded and decoded.get("sub"):
+            try:
+                user_id = int(decoded["sub"])
+            except Exception:
+                user_id = None
+
+    saved = upsert_push_subscription(endpoint, p256dh, auth, req.teams, user_id=user_id)
+    return {"status": "subscribed", "subscription": saved}
+
+
+@app.post("/push/unsubscribe")
+async def unsubscribe_push(req: PushEndpointRequest):
+    removed = delete_push_subscription(req.endpoint)
+    return {"status": "unsubscribed", "removed": removed}
+
+
+@app.post("/push/test")
+async def send_test_push(req: PushEndpointRequest):
+    sub = get_push_subscription_by_endpoint(req.endpoint)
+    if not sub:
+        raise HTTPException(status_code=404, detail="Subscription not found.")
+    sent = await asyncio.to_thread(
+        _send_web_push,
+        sub,
+        {
+            "title": "🚨 GOAL! Test Alert",
+            "body": "Chel Statz goal notifications are working on your device!",
+            "icon": "/pwa-192x192.png",
+            "badge": "/favicon-32x32.png",
+            "tag": "chelstatz-test",
+            "url": "/",
+        },
+    )
+    if not sent:
+        raise HTTPException(
+            status_code=503,
+            detail="Server Web Push is not yet configured with VAPID keys (pywebpush).",
+        )
+    return {"status": "sent"}

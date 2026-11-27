@@ -1,10 +1,10 @@
 import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
-import { Star, Flame, Trophy, Calendar, Sparkles, ChevronDown, MoveHorizontal, LogOut, LogIn } from "lucide-react";
+import { Star, Flame, Trophy, Calendar, Sparkles, ChevronDown, MoveHorizontal } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { NHL_TEAMS_METADATA } from "../utils/nhlDivisions";
-import { formatLocalDateString, isGameActiveLive } from "../utils/helpers";
+import { formatLocalDateString, isGameActiveLive, shiftDate, todayDateString, getReadableTeamColor } from "../utils/helpers";
 import { API_BASE } from "../utils/api";
 import type { StandingItem } from "../types";
 
@@ -21,7 +21,7 @@ interface FollowedTeamsWidgetProps {
 }
 
 export function FollowedTeamsWidget({ onSelectGame, isGameSelected = false }: FollowedTeamsWidgetProps) {
-  const { user, favorites, toggleFavorite, openAuthModal, logout } = useAuth();
+  const { user, favorites, toggleFavorite, openAuthModal } = useAuth();
   const navigate = useNavigate();
   const [feedData, setFeedData] = useState<TailoredFeedData | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
@@ -49,15 +49,18 @@ export function FollowedTeamsWidget({ onSelectGame, isGameSelected = false }: Fo
         }
       }
 
-      const [standingsRes, scheduleRes] = await Promise.all([
+      const pastWeekDate = shiftDate(todayDateString(), -7);
+      const [standingsRes, scheduleRes, pastScheduleRes] = await Promise.all([
         fetch(`${API_BASE}/standings/now`),
-        fetch(`${API_BASE}/schedule-week/now`)
+        fetch(`${API_BASE}/schedule-week/now`),
+        fetch(`${API_BASE}/schedule/${pastWeekDate}`)
       ]);
 
       const favSet = new Set(favorites);
       let favStandings: StandingItem[] = [];
-      let upcoming: any[] = [];
-      let recent: any[] = [];
+      const upcoming: any[] = [];
+      const recent: any[] = [];
+      const seenIds = new Set<number>();
 
       if (standingsRes.ok) {
         const sData = await standingsRes.json();
@@ -66,28 +69,40 @@ export function FollowedTeamsWidget({ onSelectGame, isGameSelected = false }: Fo
         );
       }
 
+      const combinedDays: any[] = [];
+      if (pastScheduleRes.ok) {
+        const pastData = await pastScheduleRes.json();
+        combinedDays.push(...(pastData.gameWeek || []));
+      }
       if (scheduleRes.ok) {
         const schData = await scheduleRes.json();
-        const gameWeek = schData.gameWeek || [];
-        for (const day of gameWeek) {
-          for (const game of day.games || []) {
-            const away = game.awayTeam?.abbrev;
-            const home = game.homeTeam?.abbrev;
-            if (favSet.has(away) || favSet.has(home)) {
-              if (game.gameState === "FINAL" || game.gameState === "OFF") {
-                recent.push({ ...game, gameDate: day.date });
-              } else {
-                upcoming.push({ ...game, gameDate: day.date });
-              }
+        combinedDays.push(...(schData.gameWeek || []));
+      }
+
+      for (const day of combinedDays) {
+        for (const game of day.games || []) {
+          if (seenIds.has(game.id)) continue;
+          seenIds.add(game.id);
+          const away = game.awayTeam?.abbrev;
+          const home = game.homeTeam?.abbrev;
+          if (favSet.has(away) || favSet.has(home)) {
+            const st = (game.gameState || "").toUpperCase();
+            if (st === "FINAL" || st === "OFF" || st === "OVER") {
+              recent.push({ ...game, gameDate: day.date });
+            } else {
+              upcoming.push({ ...game, gameDate: day.date });
             }
           }
         }
       }
 
+      recent.sort((a, b) => (b.gameDate || "").localeCompare(a.gameDate || "") || (b.startTimeUTC || "").localeCompare(a.startTimeUTC || ""));
+      upcoming.sort((a, b) => (a.gameDate || "").localeCompare(b.gameDate || "") || (a.startTimeUTC || "").localeCompare(b.startTimeUTC || ""));
+
       setFeedData({
         favorites,
         upcomingGames: upcoming.slice(0, 6),
-        recentGames: recent.slice(-6),
+        recentGames: recent.slice(0, 6),
         standings: favStandings
       });
     } catch (e) {
@@ -176,14 +191,6 @@ export function FollowedTeamsWidget({ onSelectGame, isGameSelected = false }: Fo
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-            <button
-              className="followed-hub-toggle-btn auth-btn-mobile"
-              onClick={(e) => { e.stopPropagation(); user ? logout() : openAuthModal("login"); }}
-              title={user ? "Log Out" : "Log In"}
-              aria-label={user ? "Log Out" : "Log In"}
-            >
-              {user ? <LogOut size={16} /> : <LogIn size={16} />}
-            </button>
             <button
               className="followed-hub-toggle-btn"
               onClick={() => setIsManuallyExpanded(isCollapsed)}
@@ -291,15 +298,24 @@ export function FollowedTeamsWidget({ onSelectGame, isGameSelected = false }: Fo
                       <div className="text-xs text-secondary p-3">No completed games yet this week.</div>
                     ) : (
                       feedData.recentGames.map((game) => {
-                        const awayFav = favorites.includes(game.awayTeam?.abbrev);
-                        const homeFav = favorites.includes(game.homeTeam?.abbrev);
+                        const awayAbbr = game.awayTeam?.abbrev;
+                        const homeAbbr = game.homeTeam?.abbrev;
+                        const awayFav = favorites.includes(awayAbbr);
+                        const homeFav = favorites.includes(homeAbbr);
                         const homeScore = game.homeTeam?.score ?? 0;
                         const awayScore = game.awayTeam?.score ?? 0;
+                        const awayWon = awayScore > homeScore;
+                        const homeWon = homeScore > awayScore;
+
+                        // Show W/L pill if exactly one of the two teams is followed
+                        let outcome: "W" | "L" | null = null;
+                        if (awayFav && !homeFav) outcome = awayWon ? "W" : "L";
+                        else if (homeFav && !awayFav) outcome = homeWon ? "W" : "L";
 
                         return (
                           <div
                             key={game.id}
-                            className="followed-game-item"
+                            className="followed-game-item followed-result-item"
                             onClick={() => {
                               if (onSelectGame) {
                                 onSelectGame(game, game.gameDate);
@@ -308,18 +324,49 @@ export function FollowedTeamsWidget({ onSelectGame, isGameSelected = false }: Fo
                               }
                             }}
                           >
-                            <div className="followed-game-teams">
-                              <span className={`text-xs ${awayFav ? "font-bold text-accent" : "text-secondary"}`}>
-                                {game.awayTeam?.abbrev} {awayScore}
-                              </span>
-                              <span className="followed-game-hyphen">-</span>
-                              <span className={`text-xs ${homeFav ? "font-bold text-accent" : "text-secondary"}`}>
-                                {game.homeTeam?.abbrev} {homeScore}
-                              </span>
+                            <div className="followed-result-matchup">
+                              <div className={`followed-result-team ${awayWon ? "winner" : "loser"} ${awayFav ? "is-fav" : ""}`}>
+                                <img
+                                  src={`https://assets.nhle.com/logos/nhl/svg/${awayAbbr}_light.svg`}
+                                  alt={awayAbbr}
+                                  className="followed-result-logo"
+                                />
+                                <span className="followed-result-abbr">{awayAbbr}</span>
+                                <span
+                                  className="followed-result-score"
+                                  style={awayWon ? { color: getReadableTeamColor(awayAbbr) } : undefined}
+                                >
+                                  {awayScore}
+                                </span>
+                              </div>
+                              <span className="followed-result-sep">–</span>
+                              <div className={`followed-result-team ${homeWon ? "winner" : "loser"} ${homeFav ? "is-fav" : ""}`}>
+                                <span
+                                  className="followed-result-score"
+                                  style={homeWon ? { color: getReadableTeamColor(homeAbbr) } : undefined}
+                                >
+                                  {homeScore}
+                                </span>
+                                <span className="followed-result-abbr">{homeAbbr}</span>
+                                <img
+                                  src={`https://assets.nhle.com/logos/nhl/svg/${homeAbbr}_light.svg`}
+                                  alt={homeAbbr}
+                                  className="followed-result-logo"
+                                />
+                              </div>
                             </div>
                             <div className="followed-game-meta">
-                              <span className="text-xs text-secondary">{formatLocalDateString(game.gameDate, { month: 'numeric', day: 'numeric' })}</span>
-                              <span className="badge-final">FINAL</span>
+                              <span className="text-xs text-secondary">
+                                {formatLocalDateString(game.gameDate, { month: "numeric", day: "numeric" })}
+                              </span>
+                              <div className="followed-result-badges">
+                                {outcome && (
+                                  <span className={`result-outcome-pill ${outcome === "W" ? "win" : "loss"}`}>
+                                    {outcome}
+                                  </span>
+                                )}
+                                <span className="badge-final">FINAL</span>
+                              </div>
                             </div>
                           </div>
                         );

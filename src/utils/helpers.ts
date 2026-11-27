@@ -152,7 +152,7 @@ function brightenHex(hex: string): string {
   return `#${toHex(r2)}${toHex(g2)}${toHex(b2)}`.toUpperCase();
 }
 
-const RAW_TEAM_COLORS: Record<string, string> = {
+export const RAW_TEAM_COLORS: Record<string, string> = {
   ANA: "#F47A38", BOS: "#FFB81C", BUF: "#002654", CGY: "#C8102E",
   CAR: "#CE1126", CHI: "#CF0A2C", COL: "#6F263D", CBJ: "#002654",
   DAL: "#006847", DET: "#CE1126", EDM: "#FF4C00", FLA: "#C8102E",
@@ -163,7 +163,50 @@ const RAW_TEAM_COLORS: Record<string, string> = {
   VGK: "#B4975A", WSH: "#C8102E", WPG: "#041E42", UTA: "#71AFE5"
 };
 
-export const TEAM_COLORS: Record<string, string> = Object.fromEntries(
+export const TEAM_SECONDARY_COLORS: Record<string, string> = {
+  ANA: "#B9975B", BOS: "#FFB81C", BUF: "#FCB514", CGY: "#F1BE48",
+  CAR: "#E03A3E", CHI: "#CF0A2C", COL: "#236192", CBJ: "#CE1126",
+  DAL: "#00843D", DET: "#CE1126", EDM: "#FF4C00", FLA: "#B9975B",
+  LAK: "#A2AAAD", MIN: "#DDCBA4", MTL: "#AF1E2D", NSH: "#FFB81C",
+  NJD: "#CE1126", NYI: "#F47D30", NYR: "#E03A3E", OTT: "#C52032",
+  PHI: "#F74902", PIT: "#FCB514", SJS: "#00A3AD", SEA: "#99D9D9",
+  STL: "#FCB514", TBL: "#4DA3FF", TOR: "#4DA3FF", VAN: "#00843D",
+  VGK: "#B4975A", WSH: "#C8102E", WPG: "#AC162C", UTA: "#71AFE5"
+};
+
+/** Returns true if a hex color has low relative luminance against dark slate backgrounds. */
+export function isDarkColor(hex: string): boolean {
+  const clean = hex.replace("#", "");
+  const r = parseInt(clean.substring(0, 2), 16) / 255;
+  const g = parseInt(clean.substring(2, 4), 16) / 255;
+  const b = parseInt(clean.substring(4, 6), 16) / 255;
+  const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  return luminance < 0.24;
+}
+
+/** True authentic NHL primary colors (no artificial HSL lightening). */
+export const TEAM_COLORS: Record<string, string> = RAW_TEAM_COLORS;
+
+/**
+ * Light-mode text-safe overrides ONLY for the few bright yellow / pale-ice NHL primaries
+ * that would otherwise lose contrast on pure white cards. All other teams use 100% authentic hexes.
+ */
+const LIGHT_BG_TEXT_OVERRIDES: Record<string, string> = {
+  BOS: "#C48400",
+  NSH: "#C48400",
+  PIT: "#C28200",
+  SEA: "#0F6D78",
+  VGK: "#8C7038",
+  UTA: "#2563A6",
+};
+
+export function getReadableTeamColor(abbr?: string): string {
+  if (!abbr) return "#0284C7";
+  const key = abbr.toUpperCase();
+  return LIGHT_BG_TEXT_OVERRIDES[key] || RAW_TEAM_COLORS[key] || "#0284C7";
+}
+
+export const BRIGHTENED_TEAM_COLORS: Record<string, string> = Object.fromEntries(
   Object.entries(RAW_TEAM_COLORS).map(([team, hex]) => [team, brightenHex(hex)])
 );
 
