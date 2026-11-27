@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { RosterCard, type RosterPlayer } from "../components/RosterCard";
 import { TEAM_COLORS } from "../utils/helpers";
@@ -39,6 +39,7 @@ export default function Teams() {
 
   const { isFavorite, toggleFavorite } = useAuth();
   const [selectedTeam, setSelectedTeam] = useState<string | null>(null);
+  const [cameFromStandings, setCameFromStandings] = useState<boolean>(false);
   const [raisingTeam, setRaisingTeam] = useState<string | null>(null);
   const [conferenceFilter, setConferenceFilter] = useState<"All" | "Eastern" | "Western">("All");
   const [rosterTab, setRosterTab] = useState<"forwards" | "defensemen" | "goalies">("forwards");
@@ -81,6 +82,17 @@ export default function Teams() {
     }
   };
 
+  // Auto-open a team's roster when navigated from Standings
+  useEffect(() => {
+    const incomingTeam = location.state?.selectedTeam;
+    if (incomingTeam && typeof incomingTeam === "string") {
+      setCameFromStandings(Boolean(location.state?.fromStandings));
+      handleSelectTeam(incomingTeam);
+      navigate("/teams", { replace: true, state: {} });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state?.selectedTeam]);
+
   const handleCardClick = async (abbr: string) => {
     if (isSelectingForFollow) {
       if (!isFavorite(abbr)) {
@@ -110,6 +122,11 @@ export default function Teams() {
   };
 
   const handleBack = () => {
+    if (cameFromStandings) {
+      setCameFromStandings(false);
+      navigate("/standings");
+      return;
+    }
     setRaisingTeam(selectedTeam);
     setSelectedTeam(null);
     setRoster(null);
@@ -259,7 +276,7 @@ export default function Teams() {
             transition={{ type: "spring", stiffness: 320, damping: 26, delay: 0.15 }}
             >
               <ArrowLeft size={20} />
-              <span>Back to Teams</span>
+              <span>{cameFromStandings ? "Back to Standings" : "Back to Teams"}</span>
             </motion.button>
             
             <motion.div 

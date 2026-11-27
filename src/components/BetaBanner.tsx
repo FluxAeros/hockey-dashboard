@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { Sparkles, MessageSquarePlus, X } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { APP_VERSION } from "../utils/version";
 
-const BANNER_DISMISSED_KEY = "chelstatz_beta_banner_dismissed_v0.9.0";
+const BANNER_DISMISSED_KEY = `chelstatz_beta_banner_dismissed_v${APP_VERSION}`;
 
 export function BetaBanner() {
   const [isDismissed, setIsDismissed] = useState<boolean>(true);
@@ -29,7 +30,7 @@ export function BetaBanner() {
       <div className="beta-banner-content">
         <div className="beta-banner-left">
           <span className="beta-banner-tag">
-            <Sparkles size={12} /> BETA
+            <Sparkles size={12} /> BETA v{APP_VERSION}
           </span>
           <span className="beta-banner-text">
             Welcome to Chel Statz Beta! We're testing live expected goals, win probability & matchup boards.

@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import type { StandingItem, StandingsResponse } from "../types";
 import { TEAM_COLORS } from "../utils/helpers";
 import { Trophy } from "lucide-react";
@@ -13,6 +14,7 @@ const DIVISION_ORDER = ["Atlantic", "Metropolitan", "Central", "Pacific"];
 const CONFERENCE_ORDER = ["Eastern", "Western"];
 
 export default function Standings() {
+  const navigate = useNavigate();
   const [standings, setStandings] = useState<StandingItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -95,9 +97,27 @@ export default function Standings() {
                   aria-expanded={isExpanded}
                 >
                   <span className="mobile-rank">{idx + 1}</span>
-                  <img src={team.teamLogo} alt={team.teamName?.default} className="standings-team-logo" />
-                  <span className="mobile-team-name">{team.teamName?.default}</span>
-                  <span className="mobile-team-abbr">{abbr}</span>
+                  <span
+                    className="mobile-team-link"
+                    role="link"
+                    tabIndex={0}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (abbr) navigate("/teams", { state: { selectedTeam: abbr, fromStandings: true } });
+                    }}
+                    onKeyDown={(e) => {
+                      if ((e.key === "Enter" || e.key === " ") && abbr) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        navigate("/teams", { state: { selectedTeam: abbr, fromStandings: true } });
+                      }
+                    }}
+                    title={`View ${team.teamName?.default || abbr} roster`}
+                  >
+                    <img src={team.teamLogo} alt={team.teamName?.default} className="standings-team-logo" />
+                    <span className="mobile-team-name">{team.teamName?.default}</span>
+                    <span className="mobile-team-abbr">{abbr}</span>
+                  </span>
                   {team.clinchIndicator && (
                     <span className="clinch-badge">{team.clinchIndicator}</span>
                   )}
@@ -192,9 +212,19 @@ export default function Standings() {
                     <tr key={team.teamAbbrev?.default || idx} className={`standings-row ${isPlayoffDivider ? "border-playoff-cutoff" : ""}`}>
                       <td className="td-team">
                         <div className="team-cell">
-                          <img src={team.teamLogo} alt={team.teamName?.default} className="standings-team-logo" />
-                          <span className="team-cell-name">{team.teamName?.default}</span>
-                          <span className="team-cell-abbr">{team.teamAbbrev?.default}</span>
+                          <button
+                            type="button"
+                            className="team-cell-link"
+                            onClick={() => {
+                              const abbr = team.teamAbbrev?.default;
+                              if (abbr) navigate("/teams", { state: { selectedTeam: abbr, fromStandings: true } });
+                            }}
+                            title={`View ${team.teamName?.default || team.teamAbbrev?.default} roster`}
+                          >
+                            <img src={team.teamLogo} alt={team.teamName?.default} className="standings-team-logo" />
+                            <span className="team-cell-name">{team.teamName?.default}</span>
+                            <span className="team-cell-abbr">{team.teamAbbrev?.default}</span>
+                          </button>
                           {team.clinchIndicator && (
                             <span className="clinch-badge" title={`Clinched ${team.clinchIndicator}`}>
                               {team.clinchIndicator}

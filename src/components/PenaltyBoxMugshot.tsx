@@ -1,37 +1,60 @@
 import { useState, useEffect } from "react";
 import type { PowerPlayInfo } from "../types";
-import { TEAM_COLORS } from "../utils/helpers";
+import { TEAM_COLORS, getReadableTeamColor } from "../utils/helpers";
 
 interface PenaltyBoxMugshotProps {
   powerPlay: PowerPlayInfo;
+  clockRunning?: boolean;
+  inIntermission?: boolean;
   isTestPreview?: boolean;
   onDismissTest?: () => void;
 }
 
-export function PenaltyBoxMugshot({ powerPlay, isTestPreview, onDismissTest }: PenaltyBoxMugshotProps) {
+export function PenaltyBoxMugshot({
+  powerPlay,
+  clockRunning,
+  inIntermission,
+  isTestPreview,
+  onDismissTest,
+}: PenaltyBoxMugshotProps) {
   const penalty = powerPlay.penalty;
-  if (!penalty) return null;
+  const isClockRunning = isTestPreview
+    ? true
+    : (clockRunning ?? powerPlay.clockRunning ?? false) &&
+      !(inIntermission ?? powerPlay.inIntermission ?? false);
 
   const [secondsLeft, setSecondsLeft] = useState<number>(() => {
-    return penalty.secondsRemaining ?? penalty.durationMinutes * 60;
+    return penalty?.secondsRemaining ?? (penalty?.durationMinutes ?? 2) * 60;
   });
 
-  useEffect(() => {
-    setSecondsLeft(penalty.secondsRemaining ?? penalty.durationMinutes * 60);
-  }, [penalty.secondsRemaining, penalty.durationMinutes]);
+  const [imgError, setImgError] = useState(false);
 
+  // Re-sync whenever server sends an updated penalty or remaining time
   useEffect(() => {
-    if (secondsLeft <= 0) return;
+    if (!penalty) return;
+    setSecondsLeft(penalty.secondsRemaining ?? penalty.durationMinutes * 60);
+    setImgError(false);
+  }, [penalty?.playerId, penalty?.secondsRemaining, penalty?.durationMinutes]);
+
+  // Only tick the local countdown while the official game clock is actively running
+  useEffect(() => {
+    if (!penalty || !isClockRunning || secondsLeft <= 0) return;
     const timer = setInterval(() => {
-      setSecondsLeft(prev => Math.max(0, prev - 1));
+      setSecondsLeft((prev) => Math.max(0, prev - 1));
     }, 1000);
     return () => clearInterval(timer);
-  }, [secondsLeft]);
+  }, [penalty, isClockRunning, secondsLeft > 0]);
+
+  if (!penalty || (!isTestPreview && (!powerPlay.hasPowerPlay || secondsLeft <= 0))) {
+    return null;
+  }
 
   const shTeamAbbr = powerPlay.shortHandedTeamAbbr || "DEF";
   const ppTeamAbbr = powerPlay.ppTeamAbbr || "OFF";
-  const shColor = TEAM_COLORS[shTeamAbbr] || "#ef4444";
-  const ppColor = TEAM_COLORS[ppTeamAbbr] || "#f59e0b";
+  const shColor = TEAM_COLORS[shTeamAbbr] || "#dc2626";
+  const ppColor = TEAM_COLORS[ppTeamAbbr] || "#b45309";
+  const shTextColor = getReadableTeamColor(shTeamAbbr);
+  const ppTextColor = getReadableTeamColor(ppTeamAbbr);
 
   const mins = Math.floor(secondsLeft / 60);
   const secs = secondsLeft % 60;
@@ -39,8 +62,6 @@ export function PenaltyBoxMugshot({ powerPlay, isTestPreview, onDismissTest }: P
 
   const totalDurationSecs = Math.max(1, (penalty.durationMinutes || 2) * 60);
   const progressPct = Math.min(100, Math.max(0, ((totalDurationSecs - secondsLeft) / totalDurationSecs) * 100));
-
-  const [imgError, setImgError] = useState(false);
 
   return (
     <div className="penalty-mugshot-container">
@@ -52,7 +73,7 @@ export function PenaltyBoxMugshot({ powerPlay, isTestPreview, onDismissTest }: P
             <span className="penalty-header-title">PENALTY BOX</span>
           </div>
           <div className="penalty-header-right">
-            <span className="pp-advantage-tag" style={{ color: ppColor, borderColor: `${ppColor}66`, backgroundColor: `${ppColor}18` }}>
+            <span className="pp-advantage-tag" style={{ color: ppTextColor, borderColor: `${ppColor}55`, backgroundColor: `${ppColor}16` }}>
               {ppTeamAbbr} POWER PLAY ({powerPlay.advantage})
             </span>
             {isTestPreview && (
@@ -73,11 +94,11 @@ export function PenaltyBoxMugshot({ powerPlay, isTestPreview, onDismissTest }: P
           {/* Mugshot Polaroid Frame */}
           <div className="mugshot-frame">
             <div className="mugshot-height-lines" aria-hidden="true">
-              <span>6'4"</span>
-              <span>6'2"</span>
-              <span>6'0"</span>
-              <span>5'10"</span>
-              <span>5'8"</span>
+              <span>6&apos;4&quot;</span>
+              <span>6&apos;2&quot;</span>
+              <span>6&apos;0&quot;</span>
+              <span>5&apos;10&quot;</span>
+              <span>5&apos;8&quot;</span>
             </div>
             {!imgError ? (
               <img
@@ -112,8 +133,15 @@ export function PenaltyBoxMugshot({ powerPlay, isTestPreview, onDismissTest }: P
 
             {/* Countdown Clock */}
             <div className="penalty-clock-block">
-              <div className="penalty-clock-label">TIME REMAINING</div>
-              <div className="penalty-clock-digits" style={{ color: secondsLeft <= 30 ? "#ef4444" : "#f59e0b" }}>
+              <div className="penalty-clock-label">
+                TIME REMAINING
+                {!isClockRunning && (
+                  <span className="penalty-clock-paused-tag">
+                    {inIntermission ?? powerPlay.inIntermission ? " · INT" : " · STOPPED"}
+                  </span>
+                )}
+              </div>
+              <div className="penalty-clock-digits" style={{ color: secondsLeft <= 30 ? "#dc2626" : "#b45309" }}>
                 {formattedTime}
               </div>
               <div className="penalty-progress-track">
@@ -128,7 +156,7 @@ export function PenaltyBoxMugshot({ powerPlay, isTestPreview, onDismissTest }: P
             </div>
 
             <div className="penalty-team-status">
-              <span className="sh-team-tag" style={{ color: shColor }}>
+              <span className="sh-team-tag" style={{ color: shTextColor }}>
                 {shTeamAbbr} SHORT-HANDED ({powerPlay.advantage.split("-on-")[1] ?? "4"} SKATERS)
               </span>
             </div>

@@ -2,19 +2,19 @@
 
 :root {
   /* Core Colors */
-  --bg-primary: #0F172A; /* Slate 900 */
-  --bg-secondary: #1E293B; /* Slate 800 */
-  --bg-tertiary: #334155; /* Slate 700 */
+  --bg-primary: #D8E4F0; /* Cool Frosted Ice Canvas */
+  --bg-secondary: #EBF2F9; /* Frosted Ice Card Surface */
+  --bg-tertiary: #D3E0EE; /* Ice Slate Controls */
   
-  --text-primary: #F8FAFC; /* Slate 50 */
-  --text-secondary: #94A3B8; /* Slate 400 */
-  --text-tertiary: #64748B; /* Slate 500 */
+  --text-primary: #0F172A; /* Slate 900 */
+  --text-secondary: #3D526B; /* Cool Slate Blue */
+  --text-tertiary: #5B728C; /* Muted Ice Slate */
   
-  --border-primary: #334155;
-  --border-secondary: #1E293B;
+  --border-primary: #B8CAE0;
+  --border-secondary: #CBD9E8;
   
-  --accent-primary: #38BDF8; /* Sky 400 */
-  --accent-secondary: #0284C7; /* Sky 600 */
+  --accent-primary: #0284C7; /* Sky 600 */
+  --accent-secondary: #0369A1; /* Sky 700 */
   
   --error: #EF4444; /* Red 500 */
   --success: #22C55E; /* Green 500 */
@@ -35,6 +35,12 @@
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
   --shadow-glow: 0 0 15px rgba(56, 189, 248, 0.3);
+
+  /* Safe-area insets (iOS Dynamic Island, Home Indicator, foldable side toolbars) */
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
 }
 
 * {
@@ -43,7 +49,7 @@
   padding: 0;
   /* Firefox */
   scrollbar-width: thin;
-  scrollbar-color: #334155 transparent;
+  scrollbar-color: #CBD5E1 transparent;
 }
 
 /* =========================================
@@ -66,7 +72,7 @@
 
 /* Thumb */
 ::-webkit-scrollbar-thumb {
-  background: #334155; /* --bg-tertiary / Slate 700 */
+  background: #CBD5E1; /* Slate 300 */
   border-radius: 99px;
   transition: background 0.2s;
 }
@@ -111,7 +117,15 @@
   background: #38BDF8;
 }
 
+html {
+  background-color: var(--bg-primary);
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  overflow-x: clip;
+}
+
 body {
+  overflow-x: clip;
   background-color: var(--bg-primary);
   color: var(--text-primary);
   font-family: var(--font-sans);
@@ -152,7 +166,7 @@ a {
 
 .btn-primary {
   background-color: var(--accent-primary);
-  color: var(--bg-primary);
+  color: #FFFFFF;
   padding: 0.5rem 1rem;
   border-radius: 0.5rem;
   font-weight: 500;
@@ -161,7 +175,7 @@ a {
 }
 
 .btn-primary:hover {
-  background-color: #7DD3FC; /* Sky 300 */
+  background-color: #0369A1; /* Sky 700 */
   box-shadow: var(--shadow-glow);
 }
 
@@ -199,4 +213,22 @@ input[type="date"] {
 input[type="date"]:focus {
   outline: none;
   border-color: var(--accent-primary);
+}
+
+
+/* Native-feeling PWA standalone polish */
+@media (display-mode: standalone) {
+  html,
+  body {
+    overscroll-behavior-y: none;
+  }
+
+  nav,
+  button,
+  .bottom-nav,
+  .sidebar {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
 }

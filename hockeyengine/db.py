@@ -508,3 +508,112 @@ def save_cached_game(game_id: str, game_state: str, data: Dict[str, Any]) -> Non
         print(f"Error saving game cache {game_id}: {e}")
     finally:
         session.close()
+
+
+
+class PushSubscription(Base):
+    __tablename__ = "push_subscriptions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    endpoint = Column(Text, unique=True, nullable=False)
+    p256dh = Column(String(255), nullable=False)
+    auth = Column(String(255), nullable=False)
+    teams_json = Column(Text, default="[]", nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    def to_dict(self):
+        try:
+            teams = json.loads(self.teams_json or "[]")
+        except Exception:
+            teams = []
+        return {
+            "id": self.id,
+            "user_id": self.user_id,
+            "endpoint": self.endpoint,
+            "keys": {"p256dh": self.p256dh, "auth": self.auth},
+            "teams": teams,
+        }
+
+
+# Ensure newly added tables (e.g. push_subscriptions) exist
+Base.metadata.create_all(bind=engine)
+
+
+def upsert_push_subscription(
+    endpoint: str,
+    p256dh: str,
+    auth: str,
+    teams: List[str],
+    user_id: Optional[int] = None,
+) -> Dict[str, Any]:
+    session = SessionLocal()
+    try:
+        clean_teams = sorted({t.upper() for t in teams if t})
+        existing = session.query(PushSubscription).filter(PushSubscription.endpoint == endpoint).first()
+        if existing:
+            existing.p256dh = p256dh
+            existing.auth = auth
+            existing.teams_json = json.dumps(clean_teams)
+            if user_id is not None:
+                existing.user_id = user_id
+            existing.updated_at = datetime.datetime.utcnow()
+            row = existing
+        else:
+            row = PushSubscription(
+                user_id=user_id,
+                endpoint=endpoint,
+                p256dh=p256dh,
+                auth=auth,
+                teams_json=json.dumps(clean_teams),
+            )
+            session.add(row)
+        session.commit()
+        return row.to_dict()
+    except Exception as e:
+        session.rollback()
+        print(f"Error saving push subscription: {e}")
+        raise
+    finally:
+        session.close()
+
+
+def delete_push_subscription(endpoint: str) -> bool:
+    session = SessionLocal()
+    try:
+        deleted = session.query(PushSubscription).filter(PushSubscription.endpoint == endpoint).delete()
+        session.commit()
+        return deleted > 0
+    except Exception as e:
+        session.rollback()
+        print(f"Error deleting push subscription: {e}")
+        return False
+    finally:
+        session.close()
+
+
+def get_push_subscriptions_for_teams(team_abbrs: List[str]) -> List[Dict[str, Any]]:
+    session = SessionLocal()
+    try:
+        target_set = {t.upper() for t in team_abbrs if t}
+        rows = session.query(PushSubscription).all()
+        matched = []
+        for r in rows:
+            d = r.to_dict()
+            sub_teams = set(d.get("teams") or [])
+            # If user subscribed with no specific team filter, notify for all games; otherwise match followed teams
+            if not sub_teams or (sub_teams & target_set):
+                matched.append(d)
+        return matched
+    finally:
+        session.close()
+
+
+def get_push_subscription_by_endpoint(endpoint: str) -> Optional[Dict[str, Any]]:
+    session = SessionLocal()
+    try:
+        row = session.query(PushSubscription).filter(PushSubscription.endpoint == endpoint).first()
+        return row.to_dict() if row else None
+    finally:
+        session.close()

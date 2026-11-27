@@ -10,3 +10,5 @@ sqlalchemy
 pyjwt
 bcrypt
 websockets
+
+pywebpush
