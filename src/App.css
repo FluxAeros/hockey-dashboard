@@ -3584,6 +3584,21 @@
   border-radius: 0.5rem;
   border: 1px solid var(--border-primary);
   width: 100%;
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.user-profile-badge:hover {
+  border-color: var(--accent-primary);
+  background-color: var(--bg-secondary);
+}
+
+.user-profile-badge.active {
+  border-color: var(--accent-primary);
+  background-color: rgba(56, 189, 248, 0.1);
+  box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.2);
 }
 
 .user-avatar-circle {
@@ -3622,18 +3637,6 @@
   gap: 0.25rem;
   font-size: 0.7rem;
   color: var(--text-secondary);
-}
-
-.user-logout-btn {
-  color: var(--text-tertiary);
-  padding: 0.3rem;
-  border-radius: 0.25rem;
-  transition: all 0.15s;
-}
-
-.user-logout-btn:hover {
-  color: var(--error);
-  background-color: rgba(239, 68, 68, 0.1);
 }
 
 .auth-login-trigger {
@@ -5634,10 +5637,6 @@
 
   .user-info-text {
     display: none;
-  }
-
-  .user-logout-btn {
-    padding: 0.35rem;
   }
 
   .main-viewport {

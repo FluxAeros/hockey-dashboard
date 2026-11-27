@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { Activity, Calendar, Trophy, Users, LogIn, LogOut, Star, ShieldCheck } from "lucide-react";
+import { Activity, Calendar, Trophy, Users, LogIn, Star, ShieldCheck } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { BetaBadge } from "../components/BetaBadge";
@@ -25,7 +25,7 @@ const BASE_NAV_LINKS = [
 
 export function Sidebar() {
   const isMobile = useMobile();
-  const { user, favorites, openAuthModal, logout } = useAuth();
+  const { user, favorites, openAuthModal } = useAuth();
 
   const sidebarNavLinks = user?.is_admin
     ? [...BASE_NAV_LINKS, { to: "/admin", icon: ShieldCheck, label: "Admin" }]
@@ -84,7 +84,12 @@ export function Sidebar() {
 
       <div className="sidebar-footer">
         {user ? (
-          <div className="user-profile-badge">
+          <NavLink
+            to="/profile"
+            className={({ isActive }) => `user-profile-badge${isActive ? " active" : ""}`}
+            title={`Profile (${user.username})`}
+            aria-label={`Profile (${user.username})`}
+          >
             <div className="user-avatar-circle">
               {user.username.charAt(0).toUpperCase()}
             </div>
@@ -98,15 +103,7 @@ export function Sidebar() {
                 {favorites.length} followed
               </span>
             </div>
-            <button
-              className="user-logout-btn"
-              onClick={logout}
-              title="Log Out"
-              aria-label="Log Out"
-            >
-              <LogOut size={15} />
-            </button>
-          </div>
+          </NavLink>
         ) : (
           <button className="nav-link auth-login-trigger" onClick={() => openAuthModal("login")} title="Sign In / Register">
             <LogIn className="nav-icon" />
